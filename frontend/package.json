@@ -1,0 +1,29 @@
+{
+  "name": "codevault-frontend",
+  "version": "1.0.0",
+  "description": "Frontend for CodeVault text steganography platform",
+  "main": "index.html",
+  "scripts": {
+    "start": "npx http-server . -p 3000 -o",
+    "dev": "npx http-server . -p 3000 -o -c-1",
+    "build": "echo 'No build step required for static HTML'",
+    "test": "echo 'No tests specified' && exit 0"
+  },
+  "keywords": [
+    "steganography",
+    "frontend",
+    "html",
+    "javascript",
+    "cybersecurity"
+  ],
+  "author": "CodeVault Team",
+  "license": "MIT",
+  "devDependencies": {
+    "http-server": "^14.1.1"
+  },
+  "browserslist": [
+    "> 1%",
+    "last 2 versions",
+    "not dead"
+  ]
+}
