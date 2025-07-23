@@ -5,308 +5,99 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>CodeVault - Text Steganography Platform</title>
     <link rel="stylesheet" href="styles.css">
-    <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🔐</text></svg>">
 </head>
 <body>
-    <!-- Header Section -->
-    <header>
-        <h1 class="logo">CodeVault</h1>
-        <nav class="navigation">
-            <button class="nav-btn active" data-mode="encode">Encode</button>
-            <button class="nav-btn" data-mode="decode">Decode</button>
-            <button class="nav-btn" data-mode="help">Help</button>
-        </nav>
-    </header>
+    <div class="container">
+        <div class="header">
+            <h1>CodeVault</h1>
+            <p>Universal Text-Based Steganography Platform</p>
+        </div>
 
-    <!-- Main Application Container -->
-    <main class="main-container">
-        
-        <!-- Encoding Mode -->
-        <section id="encode-mode" class="mode-section active">
-            <div class="container">
-                <div class="left-panel">
-                    <!-- Secret Message Input -->
-                    <div class="input-group">
-                        <label class="label">Insert Secret Message Below</label>
-                        <textarea 
-                            class="text-input" 
-                            id="secretMessage" 
-                            placeholder="Enter your secret message here..."
-                            maxlength="500"
-                        ></textarea>
-                        <div class="char-count">
-                            <span id="messageCharCount">0</span>/500 characters
-                        </div>
-                    </div>
-                    
-                    <!-- Encryption Method Selection -->
-                    <div class="input-group">
-                        <label class="label">Select Type of Encryption Below</label>
-                        <select class="dropdown" id="encryptionType">
-                            <option value="">Choose encryption method...</option>
-                            <option value="els">Equidistant Letter Sequence (ELS)</option>
-                            <option value="acrostic">Acrostic (First Letters)</option>
-                            <option value="punctuation">Punctuation Pattern</option>
-                            <option value="null-cipher">Null Cipher (Word Method)</option>
-                        </select>
-                        <div class="method-info" id="methodInfo"></div>
-                    </div>
-
-                    <!-- Security Options -->
-                    <div class="input-group">
-                        <label class="label">Security Level</label>
-                        <div class="security-options">
-                            <label class="radio-label">
-                                <input type="radio" name="security" value="light" checked>
-                                <span>Light</span>
-                            </label>
-                            <label class="radio-label">
-                                <input type="radio" name="security" value="medium">
-                                <span>Medium</span>
-                            </label>
-                            <label class="radio-label">
-                                <input type="radio" name="security" value="heavy">
-                                <span>Heavy</span>
-                            </label>
-                        </div>
-                    </div>
+        <div class="main-content">
+            <div class="panel">
+                <h2>Secret Message</h2>
+                <div class="form-group">
+                    <label for="secretMessage">Enter your secret message:</label>
+                    <input type="text" id="secretMessage" placeholder="Type your hidden message here..." maxlength="500">
                 </div>
                 
-                <div class="right-panel">
-                    <!-- Carrier Text Input -->
-                    <div class="input-group">
-                        <label class="label">Insert Text Below</label>
-                        <textarea 
-                            class="large-text-input" 
-                            id="carrierText" 
-                            placeholder="Enter or paste the text that will carry your hidden message (minimum 1000 characters recommended)..."
-                        ></textarea>
-                        <div class="char-count">
-                            <span id="carrierCharCount">0</span> characters
-                        </div>
-                    </div>
-                    
-                    <!-- File Upload Section -->
-                    <div class="upload-section">
-                        <div class="or-text">Or</div>
-                        <div class="upload-group">
-                            <span class="upload-label">Upload Text</span>
-                            <button class="upload-button" onclick="document.getElementById('fileInput').click()">
-                                UPLOAD
-                            </button>
-                            <input 
-                                type="file" 
-                                id="fileInput" 
-                                class="file-input" 
-                                accept=".txt,.md,.rtf" 
-                                onchange="handleFileUpload(event)"
-                            >
-                        </div>
-                        <div class="file-info" id="fileInfo"></div>
-                    </div>
-
-                    <!-- Text Analysis -->
-                    <div class="text-analysis" id="textAnalysis" style="display: none;">
-                        <h3>Text Analysis</h3>
-                        <div class="analysis-stats">
-                            <div class="stat">
-                                <span class="stat-label">Words:</span>
-                                <span id="wordCount">0</span>
-                            </div>
-                            <div class="stat">
-                                <span class="stat-label">Sentences:</span>
-                                <span id="sentenceCount">0</span>
-                            </div>
-                            <div class="stat">
-                                <span class="stat-label">Capacity:</span>
-                                <span id="messageCapacity">0</span>
-                            </div>
-                        </div>
-                    </div>
+                <div class="form-group">
+                    <label for="encryptionMethod">Select Encoding Method:</label>
+                    <select id="encryptionMethod">
+                        <option value="els">Equidistant Letter Sequence (ELS)</option>
+                        <option value="acrostic">Acrostic Method</option>
+                        <option value="punctuation">Punctuation Pattern</option>
+                        <option value="null">Null Cipher</option>
+                    </select>
                 </div>
             </div>
-            
-            <!-- Action Button -->
-            <div class="action-section">
-                <button class="start-button" id="startButton" onclick="startEncryption()">
-                    START ENCODING
-                </button>
-            </div>
-        </section>
 
-        <!-- Decoding Mode -->
-        <section id="decode-mode" class="mode-section">
-            <div class="decode-container">
-                <div class="input-group">
-                    <label class="label">Text to Analyze</label>
-                    <div class="decode-input-options">
-                        <button class="input-option active" data-option="paste">Paste Text</button>
-                        <button class="input-option" data-option="upload">Upload File</button>
-                    </div>
-                    <textarea 
-                        class="large-text-input" 
-                        id="decodeText" 
-                        placeholder="Paste the text you suspect contains a hidden message..."
-                    ></textarea>
-                    <input 
-                        type="file" 
-                        id="decodeFileInput" 
-                        class="file-input" 
-                        accept=".txt,.md,.rtf" 
-                        onchange="handleDecodeFileUpload(event)"
-                    >
-                </div>
-
-                <div class="decode-options">
-                    <div class="input-group">
-                        <label class="label">Analysis Mode</label>
-                        <div class="analysis-modes">
-                            <label class="radio-label">
-                                <input type="radio" name="analysisMode" value="auto" checked>
-                                <span>Auto-Scan (All Methods)</span>
-                            </label>
-                            <label class="radio-label">
-                                <input type="radio" name="analysisMode" value="manual">
-                                <span>Manual Parameters</span>
-                            </label>
-                        </div>
-                    </div>
-
-                    <div class="manual-options" id="manualOptions" style="display: none;">
-                        <select class="dropdown" id="decodeMethod">
-                            <option value="els">ELS Method</option>
-                            <option value="acrostic">Acrostic Method</option>
-                            <option value="punctuation">Punctuation Pattern</option>
-                            <option value="null-cipher">Null Cipher</option>
-                        </select>
-                        <input type="number" id="skipDistance" placeholder="Skip Distance" min="1" max="100">
-                        <input type="number" id="startPosition" placeholder="Start Position" min="0">
-                    </div>
-                </div>
-
-                <button class="start-button" onclick="startDecoding()">
-                    ANALYZE TEXT
-                </button>
-            </div>
-        </section>
-
-        <!-- Help Mode -->
-        <section id="help-mode" class="mode-section">
-            <div class="help-container">
-                <h2>How to Use CodeVault</h2>
-                
-                <div class="help-section">
-                    <h3>🔐 Encoding Messages</h3>
-                    <ol>
-                        <li>Enter your secret message in the left panel</li>
-                        <li>Choose an encryption method from the dropdown</li>
-                        <li>Provide carrier text by typing or uploading a file</li>
-                        <li>Select your preferred security level</li>
-                        <li>Click "START ENCODING" to generate the hidden message</li>
-                    </ol>
-                </div>
-
-                <div class="help-section">
-                    <h3>🔍 Decoding Messages</h3>
-                    <ol>
-                        <li>Switch to "Decode" mode</li>
-                        <li>Paste or upload the text containing the hidden message</li>
-                        <li>Choose "Auto-Scan" for automatic detection</li>
-                        <li>Click "ANALYZE TEXT" to discover hidden messages</li>
-                    </ol>
-                </div>
-
-                <div class="help-section">
-                    <h3>📖 Encoding Methods</h3>
-                    <div class="method-explanations">
-                        <div class="method">
-                            <h4>Equidistant Letter Sequence (ELS)</h4>
-                            <p>Hides messages by placing letters at regular intervals throughout the text.</p>
-                        </div>
-                        <div class="method">
-                            <h4>Acrostic</h4>
-                            <p>Uses the first letter of each line to spell out the hidden message.</p>
-                        </div>
-                        <div class="method">
-                            <h4>Punctuation Pattern</h4>
-                            <p>Encodes messages using punctuation marks in specific patterns.</p>
-                        </div>
-                        <div class="method">
-                            <h4>Null Cipher</h4>
-                            <p>Hides messages in the first letters of words or sentences.</p>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </section>
-
-        <!-- Results Section -->
-        <section class="results-section" id="resultsSection" style="display: none;">
-            <div class="results-header">
-                <h2 id="resultsTitle">Encoding Results</h2>
-                <button class="close-results" onclick="closeResults()">×</button>
-            </div>
-            
-            <div class="results-content">
-                <div class="encoded-text-container">
-                    <label class="label">Generated Text with Hidden Message</label>
-                    <div class="encoded-text" id="encodedResult"></div>
-                    <div class="text-controls">
-                        <button class="control-btn" onclick="copyToClipboard()">📋 Copy</button>
-                        <button class="control-btn" onclick="downloadResult()">💾 Download</button>
-                        <button class="control-btn" onclick="shareInstructions()">📤 Share Instructions</button>
-                    </div>
+            <div class="panel">
+                <h2>Carrier Text</h2>
+                <div class="form-group">
+                    <label for="carrierText">Enter or paste your carrier text:</label>
+                    <textarea id="carrierText" placeholder="Enter the text that will hide your message..."></textarea>
                 </div>
                 
-                <div class="encoding-details">
-                    <h3>Encoding Details</h3>
-                    <div id="encodingDetails"></div>
-                </div>
-
-                <div class="security-analysis" id="securityAnalysis">
-                    <h3>Security Analysis</h3>
-                    <div id="securityStats"></div>
+                <div class="form-group">
+                    <label>Or upload a text file:</label>
+                    <div class="file-upload">
+                        <input type="file" id="fileUpload" accept=".txt">
+                        <div class="file-upload-btn">📁 Upload Text File</div>
+                    </div>
                 </div>
             </div>
-            
-            <div class="results-actions">
-                <button class="action-button primary" onclick="resetForm()">Create New Message</button>
-                <button class="action-button secondary" onclick="switchToDecodeMode()">Test Decoding</button>
-            </div>
-        </section>
+        </div>
 
-        <!-- Decode Results Section -->
-        <section class="decode-results-section" id="decodeResultsSection" style="display: none;">
-            <div class="results-header">
-                <h2>Analysis Results</h2>
-                <button class="close-results" onclick="closeDecodeResults()">×</button>
-            </div>
-            
-            <div class="decode-results-content">
-                <div id="discoveredMessages"></div>
-            </div>
-            
-            <div class="results-actions">
-                <button class="action-button primary" onclick="resetDecodeForm()">Analyze New Text</button>
-                <button class="action-button secondary" onclick="exportAllResults()">Export All Results</button>
-            </div>
-        </section>
-    </main>
+        <div class="control-panel">
+            <button class="start-btn" id="startBtn">START ENCODING</button>
+        </div>
 
-    <!-- Loading Overlay -->
-    <div class="loading-overlay" id="loadingOverlay" style="display: none;">
-        <div class="loading-content">
-            <div class="loading-spinner"></div>
-            <p id="loadingText">Processing...</p>
+        <div id="loadingDiv" class="loading hidden">
+            <div class="spinner"></div>
+            <p>Processing your message...</p>
+        </div>
+
+        <div id="resultsDiv" class="results hidden">
+            <h2>Encoded Result</h2>
+            <div id="resultText" class="result-text"></div>
+            
+            <div class="stats">
+                <div class="stat-item">
+                    <div class="stat-value" id="methodUsed">-</div>
+                    <div class="stat-label">Method Used</div>
+                </div>
+                <div class="stat-item">
+                    <div class="stat-value" id="textLength">-</div>
+                    <div class="stat-label">Text Length</div>
+                </div>
+                <div class="stat-item">
+                    <div class="stat-value" id="hiddenChars">-</div>
+                    <div class="stat-label">Hidden Characters</div>
+                </div>
+                <div class="stat-item">
+                    <div class="stat-value" id="securityScore">-</div>
+                    <div class="stat-label">Security Score</div>
+                </div>
+            </div>
+
+            <div class="action-buttons">
+                <button class="action-btn" id="copyBtn">📋 Copy Result</button>
+                <button class="action-btn" id="downloadBtn">💾 Download</button>
+                <button class="action-btn" id="decodeBtn">🔓 Test Decode</button>
+                <button class="action-btn reset-btn" id="resetBtn">🔄 Reset</button>
+            </div>
+        </div>
+
+        <div id="errorDiv" class="error hidden">
+            <strong>Error:</strong> <span id="errorMessage"></span>
+        </div>
+
+        <div id="successDiv" class="success hidden">
+            <strong>Success:</strong> <span id="successMessage"></span>
         </div>
     </div>
 
-    <!-- Footer -->
-    <footer>
-        <p>&copy; 2025 CodeVault - Text Steganography Platform | Academic Project</p>
-    </footer>
-
-    <!-- Scripts -->
     <script src="script.js"></script>
 </body>
 </html>
