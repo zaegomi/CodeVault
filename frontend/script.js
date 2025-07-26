@@ -191,81 +191,104 @@ class CodeVault {
             throw new Error('Secret message must contain at least one letter');
         }
 
-        // Split carrier text into lines, or create lines if none exist
-        let lines = carrierText.includes('\n') ? carrierText.split('\n') : [carrierText];
-        let encodedLines = [...lines];
+        // Split carrier text into lines - be more conservative about line breaks
+        let lines = carrierText.split('\n').filter(line => line.trim().length > 0);
         
-        // If we don't have enough lines, split long lines or add new ones
-        if (encodedLines.length < cleanMessage.length) {
-            // Try to split long lines into multiple lines
+        // If no line breaks exist, try to split at sentence boundaries
+        if (lines.length === 1 && lines[0].length > 100) {
+            const sentences = lines[0].split(/(?<=[.!?])\s+/);
+            if (sentences.length >= cleanMessage.length) {
+                lines = sentences.slice(0, cleanMessage.length);
+            }
+        }
+        
+        // If still not enough lines, split the text more intelligently
+        if (lines.length < cleanMessage.length) {
             let newLines = [];
-            for (let line of encodedLines) {
-                if (line.length > 50) {
-                    // Split long lines at word boundaries
-                    const words = line.split(' ');
-                    let currentLine = '';
-                    for (let word of words) {
-                        if (currentLine.length + word.length > 50 && currentLine.length > 0) {
-                            newLines.push(currentLine.trim());
-                            currentLine = word + ' ';
-                        } else {
-                            currentLine += word + ' ';
+            
+            for (let line of lines) {
+                if (line.length > 80 && newLines.length < cleanMessage.length) {
+                    // Split at natural break points: commas, semicolons, conjunctions
+                    const breakPoints = line.split(/(?:,\s+|;\s+|\s+and\s+|\s+but\s+|\s+or\s+|\s+so\s+)/);
+                    
+                    if (breakPoints.length > 1) {
+                        for (let part of breakPoints) {
+                            if (part.trim().length > 10) {
+                                newLines.push(part.trim());
+                                if (newLines.length >= cleanMessage.length) break;
+                            }
                         }
-                    }
-                    if (currentLine.trim().length > 0) {
-                        newLines.push(currentLine.trim());
+                    } else {
+                        newLines.push(line);
                     }
                 } else {
                     newLines.push(line);
                 }
+                
+                if (newLines.length >= cleanMessage.length) break;
             }
-            encodedLines = newLines;
+            lines = newLines;
         }
         
-        // Still need more lines? Add them
-        while (encodedLines.length < cleanMessage.length) {
-            const sampleLines = [
-                'Another sentence continues the narrative flow naturally.',
-                'This additional content maintains the document structure.',
-                'Extra text helps preserve the original meaning.',
-                'Further details support the main topic discussed.',
-                'More information adds depth to the subject matter.',
-                'Additional context enriches the overall content.',
-                'These words contribute to the document length.',
-                'Such sentences help disguise the hidden message.'
+        // Only add minimal lines if absolutely necessary
+        if (lines.length < cleanMessage.length) {
+            const needed = cleanMessage.length - lines.length;
+            
+            // Add contextually relevant short lines
+            const contextualLines = [
+                'Hence the conclusion.',
+                'Therefore we see.',
+                'Thus it follows.',
+                'Moreover this shows.',
+                'Furthermore it proves.',
+                'Additionally we note.',
+                'Consequently we find.',
+                'Nevertheless it stands.'
             ];
-            const randomLine = sampleLines[Math.floor(Math.random() * sampleLines.length)];
-            encodedLines.push(randomLine);
+            
+            for (let i = 0; i < needed; i++) {
+                const selectedLine = contextualLines[i % contextualLines.length];
+                lines.push(selectedLine);
+            }
         }
 
-        // Modify first letter of each line to match message
+        // Trim to exactly what we need
+        lines = lines.slice(0, cleanMessage.length);
+
+        // Modify first letter of each line to match the secret message
+        let encodedLines = [];
+        let modificationsCount = 0;
+        
         for (let i = 0; i < cleanMessage.length; i++) {
             const targetChar = cleanMessage[i];
-            let line = encodedLines[i] || '';
+            let line = lines[i] || '';
             
-            if (line.length === 0) {
-                // Create new line starting with target character
-                const continuations = ['ddressing this topic further.', 'nalyzing the data shows.', 'ccording to research.', 'lso important to note.'];
-                const randomContinuation = continuations[Math.floor(Math.random() * continuations.length)];
-                encodedLines[i] = targetChar.toUpperCase() + randomContinuation;
-            } else {
-                // Find and replace first alphabetic character
-                let modified = false;
-                for (let j = 0; j < line.length; j++) {
-                    if (line[j].match(/[a-zA-Z]/)) {
-                        const isUpperCase = line[j] === line[j].toUpperCase();
-                        encodedLines[i] = line.substring(0, j) + 
-                                        (isUpperCase ? targetChar.toUpperCase() : targetChar) + 
-                                        line.substring(j + 1);
-                        modified = true;
-                        break;
-                    }
-                }
-                if (!modified) {
-                    // No letters found, prepend target character
-                    encodedLines[i] = targetChar.toUpperCase() + ' ' + line;
+            // Find the first alphabetic character and its position
+            let firstLetterIndex = -1;
+            for (let j = 0; j < line.length; j++) {
+                if (line[j].match(/[a-zA-Z]/)) {
+                    firstLetterIndex = j;
+                    break;
                 }
             }
+            
+            if (firstLetterIndex !== -1) {
+                const originalChar = line[firstLetterIndex];
+                const isUpperCase = originalChar === originalChar.toUpperCase();
+                const newChar = isUpperCase ? targetChar.toUpperCase() : targetChar;
+                
+                // Only modify if different
+                if (originalChar.toLowerCase() !== targetChar) {
+                    line = line.substring(0, firstLetterIndex) + newChar + line.substring(firstLetterIndex + 1);
+                    modificationsCount++;
+                }
+            } else {
+                // No letters found - prepend the target character naturally
+                line = targetChar.toUpperCase() + (line.length > 0 ? ' ' + line : '.');
+                modificationsCount++;
+            }
+            
+            encodedLines.push(line);
         }
 
         const securityScore = this.calculateSecurityScore(cleanMessage.length, encodedLines.join('\n').length, 'acrostic');
@@ -274,11 +297,14 @@ class CodeVault {
             encodedText: encodedLines.join('\n'),
             method: 'Acrostic Method',
             linesUsed: cleanMessage.length,
+            modificationsCount: modificationsCount,
+            originalLines: lines.length,
             securityScore: securityScore,
             instructions: {
                 method: 'Acrostic',
                 readFirstLetters: true,
-                numberOfLines: cleanMessage.length
+                numberOfLines: cleanMessage.length,
+                modificationsCount: modificationsCount
             }
         };
     }
@@ -289,26 +315,48 @@ class CodeVault {
             throw new Error('Secret message cannot be empty');
         }
 
-        // Convert message to binary
-        const binaryMessage = message.split('').map(char => 
-            char.charCodeAt(0).toString(2).padStart(8, '0')
-        ).join('');
+        // Convert message to binary with detailed logging
+        const binaryMessage = message.split('').map(char => {
+            const binary = char.charCodeAt(0).toString(2).padStart(8, '0');
+            return { char: char, ascii: char.charCodeAt(0), binary: binary };
+        });
+        
+        const fullBinary = binaryMessage.map(item => item.binary).join('');
         
         let encodedText = carrierText;
         let binaryIndex = 0;
         let modifications = [];
-        let newText = '';
+        let existingPunctuation = [];
         
-        // First pass: replace existing punctuation
-        for (let i = 0; i < encodedText.length && binaryIndex < binaryMessage.length; i++) {
+        // First pass: catalog and replace existing punctuation
+        for (let i = 0; i < encodedText.length; i++) {
             const char = encodedText[i];
             if (char === '.' || char === '!') {
-                const binaryDigit = binaryMessage[binaryIndex];
+                existingPunctuation.push({
+                    position: i,
+                    original: char,
+                    context: encodedText.substring(Math.max(0, i-10), i+10)
+                });
+            }
+        }
+        
+        // Replace existing punctuation with binary pattern
+        let newText = '';
+        for (let i = 0; i < encodedText.length && binaryIndex < fullBinary.length; i++) {
+            const char = encodedText[i];
+            if (char === '.' || char === '!') {
+                const binaryDigit = fullBinary[binaryIndex];
                 const newChar = binaryDigit === '0' ? '.' : '!';
                 newText += newChar;
                 
                 if (char !== newChar) {
-                    modifications.push({position: i, original: char, new: newChar});
+                    modifications.push({
+                        position: i,
+                        original: char,
+                        new: newChar,
+                        binaryIndex: binaryIndex,
+                        represents: `${Math.floor(binaryIndex / 8) < message.length ? message[Math.floor(binaryIndex / 8)] : 'padding'} bit ${binaryIndex % 8}`
+                    });
                 }
                 binaryIndex++;
             } else {
@@ -317,52 +365,99 @@ class CodeVault {
         }
         
         encodedText = newText;
+        let addedPunctuation = [];
 
         // Second pass: add punctuation if needed
-        if (binaryIndex < binaryMessage.length) {
-            const remainingBinary = binaryMessage.substring(binaryIndex);
+        if (binaryIndex < fullBinary.length) {
+            const remainingBinary = fullBinary.substring(binaryIndex);
             
-            // Find good places to insert punctuation (after sentences)
-            const sentences = encodedText.split(/(?<=[.!?])\s+/);
-            let insertionsMade = 0;
+            // Find sentence boundaries for natural insertion
+            const sentencePattern = /([.!?])\s+/g;
+            const sentences = [];
+            let lastIndex = 0;
+            let match;
             
-            for (let i = 0; i < remainingBinary.length && i < sentences.length - 1; i++) {
-                const binaryDigit = remainingBinary[i];
-                const punctuation = binaryDigit === '0' ? '.' : '!';
-                
-                // Add punctuation after sentence
-                sentences[i] += punctuation;
-                insertionsMade++;
+            while ((match = sentencePattern.exec(encodedText)) !== null) {
+                sentences.push({
+                    end: match.index + match[0].length,
+                    punctuation: match[1]
+                });
             }
             
-            encodedText = sentences.join(' ');
+            // Insert remaining binary at sentence boundaries
+            let insertionsMade = 0;
+            let modifiedText = encodedText;
             
-            // If still need more punctuation, add at the end
+            for (let i = 0; i < remainingBinary.length && insertionsMade < sentences.length; i++) {
+                const binaryDigit = remainingBinary[i];
+                const punctuation = binaryDigit === '0' ? '.' : '!';
+                const insertPos = sentences[insertionsMade].end;
+                
+                modifiedText = modifiedText.substring(0, insertPos) + punctuation + modifiedText.substring(insertPos);
+                
+                addedPunctuation.push({
+                    position: insertPos,
+                    char: punctuation,
+                    binaryIndex: binaryIndex + i,
+                    represents: `${message[Math.floor((binaryIndex + i) / 8)] || 'overflow'} bit ${(binaryIndex + i) % 8}`
+                });
+                
+                insertionsMade++;
+                
+                // Adjust positions for subsequent insertions
+                for (let j = insertionsMade; j < sentences.length; j++) {
+                    sentences[j].end++;
+                }
+            }
+            
+            encodedText = modifiedText;
+            
+            // If still need more punctuation, add at the end with spacing
             if (insertionsMade < remainingBinary.length) {
                 const remaining = remainingBinary.substring(insertionsMade);
                 encodedText += ' ';
+                
                 for (let i = 0; i < remaining.length; i++) {
-                    encodedText += remaining[i] === '0' ? '.' : '!';
-                    if (i % 8 === 7 && i < remaining.length - 1) {
-                        encodedText += ' '; // Add space every 8 bits for readability
+                    const punctuation = remaining[i] === '0' ? '.' : '!';
+                    encodedText += punctuation;
+                    
+                    addedPunctuation.push({
+                        position: encodedText.length - 1,
+                        char: punctuation,
+                        binaryIndex: binaryIndex + insertionsMade + i,
+                        represents: `${message[Math.floor((binaryIndex + insertionsMade + i) / 8)] || 'overflow'} bit ${(binaryIndex + insertionsMade + i) % 8}`
+                    });
+                    
+                    // Add space every 8 bits for readability
+                    if ((i + 1) % 8 === 0 && i < remaining.length - 1) {
+                        encodedText += ' ';
                     }
                 }
             }
         }
 
+        const totalBitsEncoded = Math.min(binaryIndex + addedPunctuation.length, fullBinary.length);
+        const encodingComplete = totalBitsEncoded === fullBinary.length;
         const securityScore = this.calculateSecurityScore(message.length, carrierText.length, 'punctuation');
 
         return {
             encodedText: encodedText,
             method: 'Punctuation Pattern',
-            binaryLength: binaryMessage.length,
-            modifications: modifications.length,
-            bitsEncoded: Math.min(binaryIndex + (encodedText.length - carrierText.length), binaryMessage.length),
+            messageAnalysis: binaryMessage,
+            binaryLength: fullBinary.length,
+            existingPunctuation: existingPunctuation.length,
+            modificationsCount: modifications.length,
+            addedPunctuation: addedPunctuation.length,
+            totalBitsEncoded: totalBitsEncoded,
+            encodingComplete: encodingComplete,
+            encodingEfficiency: Math.round((totalBitsEncoded / fullBinary.length) * 100),
             securityScore: securityScore,
             instructions: {
                 method: 'Punctuation',
                 pattern: 'Periods (.) = 0, Exclamation marks (!) = 1',
-                binaryLength: binaryMessage.length
+                binaryLength: fullBinary.length,
+                totalBitsEncoded: totalBitsEncoded,
+                readInstructions: 'Read all punctuation marks (. and !) in order, convert to binary, then to ASCII'
             }
         };
     }
@@ -375,76 +470,123 @@ class CodeVault {
             throw new Error('Secret message must contain at least one letter');
         }
 
-        // Split into words and filter out empty ones
+        // Split into words and analyze them
         let words = carrierText.split(/\s+/).filter(word => word.length > 0);
+        let wordAnalysis = words.map((word, index) => ({
+            index: index,
+            original: word,
+            firstLetter: word.match(/[a-zA-Z]/)?.[0] || null,
+            firstLetterPos: word.search(/[a-zA-Z]/),
+            hasLetters: /[a-zA-Z]/.test(word),
+            length: word.length
+        }));
         
         if (words.length < cleanMessage.length) {
-            // Need to add more words
-            const fillerWords = [
-                'and', 'the', 'with', 'for', 'this', 'that', 'which', 'these', 'those', 'some',
-                'many', 'several', 'various', 'different', 'important', 'significant', 'relevant',
-                'appropriate', 'necessary', 'essential', 'critical', 'fundamental', 'basic',
-                'advanced', 'complex', 'simple', 'effective', 'efficient', 'useful', 'valuable'
+            // Calculate how many words we need to add
+            const wordsNeeded = cleanMessage.length - words.length;
+            
+            // Add contextually appropriate filler words
+            const contextualFillers = [
+                'also', 'thus', 'then', 'here', 'there', 'when', 'where', 'while',
+                'since', 'though', 'still', 'yet', 'just', 'quite', 'rather', 'very',
+                'well', 'indeed', 'perhaps', 'maybe', 'surely', 'truly', 'really'
             ];
             
-            while (words.length < cleanMessage.length) {
-                const randomWord = fillerWords[Math.floor(Math.random() * fillerWords.length)];
-                words.push(randomWord);
+            for (let i = 0; i < wordsNeeded; i++) {
+                const fillerWord = contextualFillers[i % contextualFillers.length];
+                words.push(fillerWord);
+                wordAnalysis.push({
+                    index: words.length - 1,
+                    original: fillerWord,
+                    firstLetter: fillerWord[0],
+                    firstLetterPos: 0,
+                    hasLetters: true,
+                    length: fillerWord.length,
+                    added: true
+                });
             }
         }
 
         let encodedWords = [...words];
+        let modifications = [];
         
         // Modify first letter of selected words to spell out the message
         for (let i = 0; i < cleanMessage.length; i++) {
             const targetChar = cleanMessage[i];
+            const wordInfo = wordAnalysis[i];
             let word = encodedWords[i];
             
-            if (word && word.length > 0) {
-                // Find first alphabetic character in the word
-                let firstLetterIndex = -1;
-                for (let j = 0; j < word.length; j++) {
-                    if (word[j].match(/[a-zA-Z]/)) {
-                        firstLetterIndex = j;
-                        break;
-                    }
-                }
+            if (wordInfo.hasLetters) {
+                const firstLetterIndex = wordInfo.firstLetterPos;
+                const originalChar = word[firstLetterIndex];
+                const isUpperCase = originalChar === originalChar.toUpperCase();
+                const newChar = isUpperCase ? targetChar.toUpperCase() : targetChar;
                 
-                if (firstLetterIndex !== -1) {
-                    // Replace the first letter
-                    const originalChar = word[firstLetterIndex];
-                    const isUpperCase = originalChar === originalChar.toUpperCase();
-                    const newChar = isUpperCase ? targetChar.toUpperCase() : targetChar;
+                // Only modify if the letter is different
+                if (originalChar.toLowerCase() !== targetChar) {
+                    const newWord = word.substring(0, firstLetterIndex) + 
+                                   newChar + 
+                                   word.substring(firstLetterIndex + 1);
                     
-                    encodedWords[i] = word.substring(0, firstLetterIndex) + 
-                                    newChar + 
-                                    word.substring(firstLetterIndex + 1);
-                } else {
-                    // No letters in word, create a new word starting with target character
-                    const wordEndings = ['ay', 'ing', 'ed', 'er', 'ly', 'ness', 'ment', 'tion'];
-                    const randomEnding = wordEndings[Math.floor(Math.random() * wordEndings.length)];
-                    encodedWords[i] = targetChar + randomEnding;
+                    encodedWords[i] = newWord;
+                    modifications.push({
+                        wordIndex: i,
+                        original: word,
+                        modified: newWord,
+                        originalLetter: originalChar,
+                        newLetter: newChar,
+                        targetChar: targetChar,
+                        position: firstLetterIndex,
+                        messageIndex: i
+                    });
                 }
             } else {
-                // Empty word, create new one
-                const wordEndings = ['ay', 'ing', 'ed', 'er', 'ly', 'ness', 'ment', 'tion'];
-                const randomEnding = wordEndings[Math.floor(Math.random() * wordEndings.length)];
-                encodedWords[i] = targetChar + randomEnding;
+                // No letters in word - create a minimal word starting with target character
+                const newWord = targetChar.toLowerCase() + 'nd';
+                encodedWords[i] = newWord;
+                modifications.push({
+                    wordIndex: i,
+                    original: word,
+                    modified: newWord,
+                    originalLetter: null,
+                    newLetter: targetChar,
+                    targetChar: targetChar,
+                    position: 0,
+                    messageIndex: i,
+                    created: true
+                });
             }
         }
 
+        // Calculate encoding statistics
+        const totalWords = encodedWords.length;
+        const wordsUsed = cleanMessage.length;
+        const wordsUnchanged = totalWords - modifications.length;
+        const encodingRatio = (cleanMessage.length / totalWords * 100).toFixed(1);
+        
         const securityScore = this.calculateSecurityScore(cleanMessage.length, carrierText.length, 'null');
 
         return {
             encodedText: encodedWords.join(' '),
             method: 'Null Cipher',
-            wordsModified: cleanMessage.length,
-            totalWords: encodedWords.length,
+            originalWords: words.length,
+            totalWords: totalWords,
+            wordsUsedForMessage: wordsUsed,
+            wordsModified: modifications.length,
+            wordsUnchanged: wordsUnchanged,
+            wordsAdded: wordAnalysis.filter(w => w.added).length,
+            encodingRatio: parseFloat(encodingRatio),
+            modifications: modifications,
             securityScore: securityScore,
             instructions: {
                 method: 'Null Cipher',
                 readFirstLetters: true,
-                numberOfWords: cleanMessage.length
+                numberOfWords: cleanMessage.length,
+                decodingSteps: [
+                    '1. Read the first letter of each word in sequence',
+                    '2. Take only the first ' + cleanMessage.length + ' letters',
+                    '3. Combine letters to form the hidden message'
+                ]
             }
         };
     }
