@@ -35,15 +35,87 @@
             <div class="panel">
                 <h2>Carrier Text</h2>
                 <div class="form-group">
-                    <label for="carrierText">Enter or paste your carrier text:</label>
-                    <textarea id="carrierText" placeholder="Enter the text that will hide your message..."></textarea>
+                    <label>Choose carrier text method:</label>
+                    <div class="carrier-method-selector">
+                        <label class="radio-option">
+                            <input type="radio" name="carrierMethod" value="manual" checked>
+                            <span class="radio-custom"></span>
+                            Manual Input
+                        </label>
+                        <label class="radio-option">
+                            <input type="radio" name="carrierMethod" value="generated">
+                            <span class="radio-custom"></span>
+                            AI Generated
+                        </label>
+                    </div>
                 </div>
-                
-                <div class="form-group">
-                    <label>Or upload a text file:</label>
-                    <div class="file-upload">
-                        <input type="file" id="fileUpload" accept=".txt">
-                        <div class="file-upload-btn">📁 Upload Text File</div>
+
+                <div id="manualCarrierSection">
+                    <div class="form-group">
+                        <label for="carrierText">Enter or paste your carrier text:</label>
+                        <textarea id="carrierText" placeholder="Enter the text that will hide your message..."></textarea>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label>Or upload a text file:</label>
+                        <div class="file-upload">
+                            <input type="file" id="fileUpload" accept=".txt">
+                            <div class="file-upload-btn">📁 Upload Text File</div>
+                        </div>
+                    </div>
+                </div>
+
+                <div id="generatedCarrierSection" class="hidden">
+                    <div class="form-group">
+                        <label for="carrierTopic">Topic/Theme for generated text:</label>
+                        <select id="carrierTopic">
+                            <option value="technology">Technology & Innovation</option>
+                            <option value="business">Business & Finance</option>
+                            <option value="science">Science & Research</option>
+                            <option value="education">Education & Learning</option>
+                            <option value="travel">Travel & Culture</option>
+                            <option value="health">Health & Wellness</option>
+                            <option value="environment">Environment & Nature</option>
+                            <option value="history">History & Society</option>
+                            <option value="literature">Literature & Arts</option>
+                            <option value="sports">Sports & Recreation</option>
+                            <option value="general">General Knowledge</option>
+                        </select>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="carrierLength">Desired text length:</label>
+                        <select id="carrierLength">
+                            <option value="short">Short (200-400 words)</option>
+                            <option value="medium" selected>Medium (400-800 words)</option>
+                            <option value="long">Long (800-1200 words)</option>
+                            <option value="custom">Custom Length</option>
+                        </select>
+                    </div>
+
+                    <div id="customLengthSection" class="hidden">
+                        <div class="form-group">
+                            <label for="customWordCount">Custom word count:</label>
+                            <input type="number" id="customWordCount" min="100" max="2000" value="600" placeholder="Enter word count">
+                        </div>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="carrierStyle">Writing style:</label>
+                        <select id="carrierStyle">
+                            <option value="formal">Formal/Academic</option>
+                            <option value="casual">Casual/Conversational</option>
+                            <option value="technical">Technical/Professional</option>
+                            <option value="narrative">Narrative/Storytelling</option>
+                            <option value="journalistic">Journalistic/News</option>
+                        </select>
+                    </div>
+
+                    <button class="generate-btn" id="generateCarrierBtn">🤖 Generate Carrier Text</button>
+                    
+                    <div class="form-group">
+                        <label for="generatedCarrierText">Generated carrier text:</label>
+                        <textarea id="generatedCarrierText" placeholder="Generated text will appear here..." readonly></textarea>
                     </div>
                 </div>
             </div>
