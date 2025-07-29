@@ -8,40 +8,55 @@ class CodeVault {
     }
 
     initializeEventListeners() {
+        // Main action buttons
         document.getElementById('startBtn').addEventListener('click', () => this.processMessage());
         document.getElementById('fileUpload').addEventListener('change', (e) => this.handleFileUpload(e));
         document.getElementById('copyBtn').addEventListener('click', () => this.copyResult());
         document.getElementById('downloadBtn').addEventListener('click', () => this.downloadResult());
         document.getElementById('decodeBtn').addEventListener('click', () => this.testDecode());
         document.getElementById('resetBtn').addEventListener('click', () => this.resetApp());
-        document.getElementById('generateCarrierBtn').addEventListener('click', () => this.generateCarrierText());
 
-        // Carrier method toggle
-        document.querySelectorAll('input[name="carrierMethod"]').forEach(radio => {
-            radio.addEventListener('change', (e) => this.toggleCarrierMethod(e.target.value));
-        });
+        // AI Generation button
+        const generateBtn = document.getElementById('generateCarrierBtn');
+        if (generateBtn) {
+            generateBtn.addEventListener('click', () => this.generateCarrierText());
+        }
 
-        // Custom length toggle
-        document.getElementById('carrierLength').addEventListener('change', (e) => {
-            const customSection = document.getElementById('customLengthSection');
-            if (e.target.value === 'custom') {
-                customSection.classList.remove('hidden');
-            } else {
-                customSection.classList.add('hidden');
-            }
-        });
+        // Radio button event listeners with direct element targeting
+        const manualRadio = document.getElementById('manualRadio');
+        const generatedRadio = document.getElementById('generatedRadio');
+        
+        if (manualRadio) {
+            manualRadio.addEventListener('change', () => {
+                if (manualRadio.checked) {
+                    this.toggleCarrierMethod('manual');
+                }
+            });
+        }
+        
+        if (generatedRadio) {
+            generatedRadio.addEventListener('change', () => {
+                if (generatedRadio.checked) {
+                    this.toggleCarrierMethod('generated');
+                }
+            });
+        }
 
         // Real-time validation
         document.getElementById('secretMessage').addEventListener('input', () => this.validateInputs());
         document.getElementById('carrierText').addEventListener('input', () => this.validateInputs());
-        document.getElementById('generatedCarrierText').addEventListener('input', () => this.validateInputs());
+        
+        const generatedTextArea = document.getElementById('generatedCarrierText');
+        if (generatedTextArea) {
+            generatedTextArea.addEventListener('input', () => this.validateInputs());
+        }
         
         // Initialize with manual method selected
         this.toggleCarrierMethod('manual');
     }
 
     toggleCarrierMethod(method) {
-        console.log('Toggling carrier method to:', method); // Debug log
+        console.log('Toggling to method:', method);
         
         const manualSection = document.getElementById('manualCarrierSection');
         const generatedSection = document.getElementById('generatedCarrierSection');
@@ -52,12 +67,12 @@ class CodeVault {
         }
         
         if (method === 'manual') {
-            manualSection.classList.remove('hidden');
-            generatedSection.classList.add('hidden');
+            manualSection.style.display = 'block';
+            generatedSection.style.display = 'none';
             console.log('Switched to manual input');
         } else {
-            manualSection.classList.add('hidden');
-            generatedSection.classList.remove('hidden');
+            manualSection.style.display = 'none';
+            generatedSection.style.display = 'block';
             console.log('Switched to AI generated');
         }
         
@@ -114,9 +129,11 @@ class CodeVault {
     }
 
     async generateCarrierText() {
-        console.log('Generate carrier text clicked'); // Debug log
+        console.log('=== GENERATE CARRIER TEXT CLICKED ===');
         
         const secretMessage = document.getElementById('secretMessage').value.trim();
+        console.log('Secret message:', secretMessage);
+        
         if (!secretMessage) {
             this.showError('Please enter a secret message first');
             return;
@@ -127,9 +144,17 @@ class CodeVault {
         const style = document.getElementById('carrierStyle').value;
         const method = document.getElementById('encryptionMethod').value;
         
-        console.log('Generation parameters:', { topic, length, style, method }); // Debug log
+        console.log('Generation parameters:', { topic, length, style, method });
         
         const generateBtn = document.getElementById('generateCarrierBtn');
+        const textArea = document.getElementById('generatedCarrierText');
+        
+        if (!generateBtn || !textArea) {
+            console.error('Missing UI elements:', { generateBtn, textArea });
+            this.showError('UI elements not found. Please refresh the page.');
+            return;
+        }
+        
         const originalText = generateBtn.textContent;
         
         // Show loading state
@@ -137,17 +162,21 @@ class CodeVault {
         generateBtn.textContent = '🔄 Generating...';
         
         try {
-            console.log('Starting text generation...'); // Debug log
-            const generatedText = this.createOptimalCarrierText(secretMessage, topic, length, style, method);
-            console.log('Generated text length:', generatedText.length); // Debug log
+            console.log('Starting text generation...');
             
-            const textArea = document.getElementById('generatedCarrierText');
+            // Use simplified generation for now
+            const generatedText = this.generateSimpleCarrierText(secretMessage, topic, length, method);
+            
+            console.log('Generated text length:', generatedText.length);
+            console.log('Generated text preview:', generatedText.substring(0, 200) + '...');
+            
             textArea.value = generatedText;
             
             this.validateInputs();
             this.showSuccess('Carrier text generated successfully! Optimized for your secret message.');
+            
         } catch (error) {
-            console.error('Generation error:', error); // Debug log
+            console.error('Generation error:', error);
             this.showError('Failed to generate carrier text: ' + error.message);
         } finally {
             generateBtn.disabled = false;
@@ -155,32 +184,155 @@ class CodeVault {
         }
     }
 
-    createOptimalCarrierText(secretMessage, topic, length, style, method) {
-        console.log('Creating optimal carrier text with method:', method); // Debug log
+    generateSimpleCarrierText(secretMessage, topic, length, method) {
+        console.log('Generating simple carrier text for method:', method);
         
         const cleanMessage = secretMessage.toLowerCase().replace(/[^a-z]/g, '');
-        const generator = new CarrierTextGenerator(topic, style, length);
+        const wordCounts = { 'short': 300, 'medium': 600, 'long': 1000 };
+        const targetWords = wordCounts[length] || 600;
         
-        let result;
-        switch (method) {
-            case 'els':
-                result = generator.generateELSOptimized(cleanMessage);
-                break;
-            case 'acrostic':
-                result = generator.generateAcrosticOptimized(cleanMessage);
-                break;
-            case 'punctuation':
-                result = generator.generatePunctuationOptimized(cleanMessage);
-                break;
-            case 'null':
-                result = generator.generateNullCipherOptimized(cleanMessage);
-                break;
-            default:
-                result = generator.generateGeneral(cleanMessage);
+        // Topic-specific content
+        const topicContent = {
+            technology: {
+                intro: "In today's rapidly evolving technological landscape, artificial intelligence and machine learning continue to revolutionize how we approach complex problems.",
+                sentences: [
+                    "Advanced algorithms demonstrate remarkable capabilities in processing vast amounts of data efficiently.",
+                    "Software development methodologies have evolved to incorporate agile practices and continuous integration.",
+                    "Cloud computing infrastructure provides scalable solutions for modern business requirements.",
+                    "Cybersecurity measures protect critical systems from emerging threats and vulnerabilities.",
+                    "Digital transformation initiatives drive innovation across multiple industry sectors.",
+                    "Machine learning models enable predictive analytics and automated decision-making processes.",
+                    "Technology platforms facilitate seamless collaboration and communication worldwide.",
+                    "Data science techniques reveal valuable insights from complex information patterns."
+                ]
+            },
+            business: {
+                intro: "Strategic business development requires comprehensive analysis of market conditions and organizational capabilities.",
+                sentences: [
+                    "Market research provides essential insights into customer preferences and competitive landscapes.",
+                    "Financial planning ensures sustainable growth and effective resource allocation strategies.",
+                    "Leadership development programs enhance organizational performance and employee engagement.",
+                    "Supply chain optimization improves efficiency and reduces operational costs significantly.",
+                    "Customer relationship management systems strengthen brand loyalty and retention rates.",
+                    "Performance metrics guide decision-making processes and strategic planning initiatives.",
+                    "Innovation strategies drive competitive advantage in dynamic market environments.",
+                    "Stakeholder engagement promotes transparency and collaborative business relationships."
+                ]
+            },
+            science: {
+                intro: "Scientific research methodologies provide rigorous frameworks for investigation and discovery across multiple disciplines.",
+                sentences: [
+                    "Experimental design ensures reliable data collection and statistical validity in research studies.",
+                    "Peer review processes maintain quality standards and scientific integrity in publications.",
+                    "Hypothesis testing enables systematic evaluation of theoretical predictions and observations.",
+                    "Data analysis techniques reveal patterns and correlations within complex datasets.",
+                    "Research collaboration facilitates knowledge sharing and interdisciplinary discoveries.",
+                    "Laboratory protocols ensure reproducibility and accuracy in experimental procedures.",
+                    "Scientific communication bridges the gap between research findings and practical applications.",
+                    "Evidence-based conclusions support informed decision-making in policy and practice."
+                ]
+            },
+            education: {
+                intro: "Educational methodologies continue to evolve with advances in learning theory and instructional technology.",
+                sentences: [
+                    "Student-centered approaches enhance engagement and promote active learning experiences.",
+                    "Assessment strategies provide valuable feedback on learning progress and achievement.",
+                    "Curriculum development aligns educational objectives with real-world applications.",
+                    "Technology integration supports diverse learning styles and accessibility requirements.",
+                    "Professional development opportunities enhance teaching effectiveness and student outcomes.",
+                    "Learning analytics provide insights into educational patterns and improvement opportunities.",
+                    "Collaborative learning environments foster critical thinking and communication skills.",
+                    "Educational research informs evidence-based practices in teaching and learning."
+                ]
+            },
+            general: {
+                intro: "Contemporary analysis of complex systems reveals important patterns and relationships that inform our understanding.",
+                sentences: [
+                    "Comprehensive examination of available evidence provides valuable insights and perspectives.",
+                    "Systematic investigation demonstrates the importance of methodical approaches to problem-solving.",
+                    "Detailed analysis reveals significant trends and developments in various fields.",
+                    "Evidence-based conclusions support informed decision-making and strategic planning.",
+                    "Thorough evaluation of multiple factors ensures comprehensive understanding of complex issues.",
+                    "Research findings contribute to expanding knowledge and practical applications.",
+                    "Professional standards guide quality assurance and best practices in various industries.",
+                    "Collaborative efforts enhance outcomes and promote shared understanding of challenges."
+                ]
+            }
+        };
+        
+        const content = topicContent[topic] || topicContent.general;
+        let text = content.intro + ' ';
+        
+        // Add sentences based on method requirements
+        if (method === 'acrostic') {
+            // For acrostic, create lines that start with message letters
+            const lines = [];
+            for (let i = 0; i < cleanMessage.length; i++) {
+                const char = cleanMessage[i].toUpperCase();
+                const sentence = content.sentences[i % content.sentences.length];
+                lines.push(char + sentence.substring(1));
+            }
+            return lines.join('\n');
         }
         
-        console.log('Generated result preview:', result.substring(0, 100) + '...'); // Debug log
-        return result;
+        // For other methods, generate flowing text
+        while (this.countWords(text) < targetWords) {
+            const sentence = content.sentences[Math.floor(Math.random() * content.sentences.length)];
+            text += sentence + ' ';
+            
+            // Add paragraph breaks occasionally
+            if (Math.random() > 0.7 && this.countWords(text) > 100) {
+                text += '\n\n';
+            }
+        }
+        
+        // Method-specific optimizations
+        if (method === 'punctuation') {
+            text = this.addStrategicPunctuation(text);
+        } else if (method === 'els') {
+            text = this.optimizeForELS(text, cleanMessage);
+        }
+        
+        return text.trim();
+    }
+
+    addStrategicPunctuation(text) {
+        // Add periods and exclamation marks strategically
+        return text.replace(/\./g, Math.random() > 0.5 ? '.' : '!')
+                  .replace(/,/g, Math.random() > 0.8 ? '. ' : ', ');
+    }
+
+    optimizeForELS(text, message) {
+        // Ensure enough instances of each letter
+        for (let char of message) {
+            if (char.match(/[a-z]/)) {
+                const count = (text.toLowerCase().match(new RegExp(char, 'g')) || []).length;
+                if (count < 5) {
+                    const words = this.getWordsWithLetter(char);
+                    text += ` Additional ${words[0]} analysis demonstrates ${words[1]} outcomes. `;
+                }
+            }
+        }
+        return text;
+    }
+
+    getWordsWithLetter(letter) {
+        const letterWords = {
+            'a': ['advanced', 'analysis'], 'b': ['beneficial', 'business'], 'c': ['comprehensive', 'critical'],
+            'd': ['detailed', 'development'], 'e': ['effective', 'evaluation'], 'f': ['fundamental', 'framework'],
+            'g': ['general', 'growth'], 'h': ['however', 'highlighted'], 'i': ['important', 'implementation'],
+            'j': ['justified', 'joint'], 'k': ['knowledge', 'key'], 'l': ['logical', 'learning'],
+            'm': ['methodology', 'modern'], 'n': ['necessary', 'natural'], 'o': ['outcomes', 'optimal'],
+            'p': ['process', 'performance'], 'q': ['quality', 'questions'], 'r': ['research', 'results'],
+            's': ['systematic', 'significant'], 't': ['theoretical', 'techniques'], 'u': ['understanding', 'useful'],
+            'v': ['valuable', 'various'], 'w': ['work', 'widespread'], 'x': ['examined', 'experience'],
+            'y': ['years', 'yield'], 'z': ['zero', 'zones']
+        };
+        return letterWords[letter] || ['additional', 'analysis'];
+    }
+
+    countWords(text) {
+        return text.trim().split(/\s+/).filter(word => word.length > 0).length;
     }
 
     async processMessage() {
