@@ -35,18 +35,30 @@ class CodeVault {
         document.getElementById('secretMessage').addEventListener('input', () => this.validateInputs());
         document.getElementById('carrierText').addEventListener('input', () => this.validateInputs());
         document.getElementById('generatedCarrierText').addEventListener('input', () => this.validateInputs());
+        
+        // Initialize with manual method selected
+        this.toggleCarrierMethod('manual');
     }
 
     toggleCarrierMethod(method) {
+        console.log('Toggling carrier method to:', method); // Debug log
+        
         const manualSection = document.getElementById('manualCarrierSection');
         const generatedSection = document.getElementById('generatedCarrierSection');
+        
+        if (!manualSection || !generatedSection) {
+            console.error('Could not find carrier sections');
+            return;
+        }
         
         if (method === 'manual') {
             manualSection.classList.remove('hidden');
             generatedSection.classList.add('hidden');
+            console.log('Switched to manual input');
         } else {
             manualSection.classList.add('hidden');
             generatedSection.classList.remove('hidden');
+            console.log('Switched to AI generated');
         }
         
         this.validateInputs();
@@ -102,6 +114,8 @@ class CodeVault {
     }
 
     async generateCarrierText() {
+        console.log('Generate carrier text clicked'); // Debug log
+        
         const secretMessage = document.getElementById('secretMessage').value.trim();
         if (!secretMessage) {
             this.showError('Please enter a secret message first');
@@ -113,6 +127,8 @@ class CodeVault {
         const style = document.getElementById('carrierStyle').value;
         const method = document.getElementById('encryptionMethod').value;
         
+        console.log('Generation parameters:', { topic, length, style, method }); // Debug log
+        
         const generateBtn = document.getElementById('generateCarrierBtn');
         const originalText = generateBtn.textContent;
         
@@ -121,11 +137,17 @@ class CodeVault {
         generateBtn.textContent = '🔄 Generating...';
         
         try {
+            console.log('Starting text generation...'); // Debug log
             const generatedText = this.createOptimalCarrierText(secretMessage, topic, length, style, method);
-            document.getElementById('generatedCarrierText').value = generatedText;
+            console.log('Generated text length:', generatedText.length); // Debug log
+            
+            const textArea = document.getElementById('generatedCarrierText');
+            textArea.value = generatedText;
+            
             this.validateInputs();
             this.showSuccess('Carrier text generated successfully! Optimized for your secret message.');
         } catch (error) {
+            console.error('Generation error:', error); // Debug log
             this.showError('Failed to generate carrier text: ' + error.message);
         } finally {
             generateBtn.disabled = false;
@@ -134,21 +156,31 @@ class CodeVault {
     }
 
     createOptimalCarrierText(secretMessage, topic, length, style, method) {
+        console.log('Creating optimal carrier text with method:', method); // Debug log
+        
         const cleanMessage = secretMessage.toLowerCase().replace(/[^a-z]/g, '');
         const generator = new CarrierTextGenerator(topic, style, length);
         
+        let result;
         switch (method) {
             case 'els':
-                return generator.generateELSOptimized(cleanMessage);
+                result = generator.generateELSOptimized(cleanMessage);
+                break;
             case 'acrostic':
-                return generator.generateAcrosticOptimized(cleanMessage);
+                result = generator.generateAcrosticOptimized(cleanMessage);
+                break;
             case 'punctuation':
-                return generator.generatePunctuationOptimized(cleanMessage);
+                result = generator.generatePunctuationOptimized(cleanMessage);
+                break;
             case 'null':
-                return generator.generateNullCipherOptimized(cleanMessage);
+                result = generator.generateNullCipherOptimized(cleanMessage);
+                break;
             default:
-                return generator.generateGeneral(cleanMessage);
+                result = generator.generateGeneral(cleanMessage);
         }
+        
+        console.log('Generated result preview:', result.substring(0, 100) + '...'); // Debug log
+        return result;
     }
 
     async processMessage() {
