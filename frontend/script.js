@@ -916,6 +916,10 @@ class CodeVault {
         try {
             let decodedMessage = '';
             const instructions = this.decodingInstructions;
+            const originalMessage = document.getElementById('secretMessage').value;
+
+            console.log('Decoding with instructions:', instructions);
+            console.log('Encoded text length:', this.currentResult.length);
 
             switch (instructions.method) {
                 case 'ELS':
@@ -930,85 +934,195 @@ class CodeVault {
                 case 'Null Cipher':
                     decodedMessage = this.decodeNullCipher(this.currentResult, instructions);
                     break;
+                default:
+                    throw new Error('Unknown decoding method: ' + instructions.method);
             }
 
-            const originalMessage = document.getElementById('secretMessage').value.toLowerCase().replace(/[^a-z]/g, '');
+            console.log('Decoded message:', decodedMessage);
+            console.log('Original message:', originalMessage);
+
+            // Compare properly - remove spaces and non-letters from both for comparison
+            const cleanOriginal = originalMessage.toLowerCase().replace(/[^a-z]/g, '');
             const cleanDecoded = decodedMessage.toLowerCase().replace(/[^a-z]/g, '');
 
-            if (cleanDecoded === originalMessage) {
-                this.showSuccess(`Decode test successful! Retrieved: "${decodedMessage}"`);
+            console.log('Clean original (letters only):', cleanOriginal);
+            console.log('Clean decoded (letters only):', cleanDecoded);
+
+            if (cleanDecoded === cleanOriginal) {
+                this.showSuccess(`✅ Decode test successful! Retrieved: "${decodedMessage}"`);
             } else {
-                this.showError(`Decode test failed. Got: "${decodedMessage}", Expected: "${originalMessage}"`);
+                // Show detailed comparison for debugging
+                this.showError(`❌ Decode test failed.\nGot: "${decodedMessage}" (${cleanDecoded.length} chars)\nExpected: "${originalMessage}" (${cleanOriginal.length} chars)\nMethod: ${instructions.method}`);
+                console.log('Decode mismatch details:');
+                console.log('Clean decoded:', cleanDecoded);
+                console.log('Clean original:', cleanOriginal);
+                console.log('Instructions used:', instructions);
             }
         } catch (error) {
             this.showError('Decode test failed: ' + error.message);
+            console.error('Decode error:', error);
         }
     }
 
     decodeELS(text, instructions) {
-        const cleanText = text.toLowerCase().replace(/[^a-z]/g, '');
+        console.log('=== ELS DECODING DEBUG ===');
+        console.log('Skip distance:', instructions.skipDistance);
+        console.log('Start position:', instructions.startPosition);
+        console.log('Message length:', instructions.messageLength);
+        console.log('Text length:', text.length);
+        
+        // The ELS encoding places characters at specific positions in the ORIGINAL text
+        // We need to extract from those exact same positions
         let decodedMessage = '';
-        let currentPos = instructions.startPosition;
+        let currentPos = 0; // Start from beginning, not the startPosition
+        
+        console.log('Extraction positions:');
         
         for (let i = 0; i < instructions.messageLength; i++) {
-            if (currentPos < cleanText.length) {
-                decodedMessage += cleanText[currentPos];
-                currentPos += instructions.skipDistance;
+            let placed = false;
+            
+            // Look within the skip distance window, just like encoding does
+            for (let j = 0; j < instructions.skipDistance && !placed; j++) {
+                const pos = currentPos + j;
+                if (pos < text.length) {
+                    const char = text[pos];
+                    if (char.match(/[a-zA-Z]/)) {
+                        decodedMessage += char.toLowerCase();
+                        console.log(`Position ${i}: Found '${char}' at text position ${pos}`);
+                        placed = true;
+                    }
+                }
             }
+            
+            if (!placed) {
+                console.warn(`Position ${i}: No letter found in window ${currentPos} to ${currentPos + instructions.skipDistance - 1}`);
+            }
+            
+            currentPos += instructions.skipDistance;
         }
+        
+        console.log('Final decoded message:', decodedMessage);
+        console.log('=== END ELS DECODING ===');
         
         return decodedMessage;
     }
 
     decodeAcrostic(text, instructions) {
+        console.log('=== ACROSTIC DECODING DEBUG ===');
+        console.log('Number of lines needed:', instructions.numberOfLines);
+        
         const lines = text.split('\n');
         let decodedMessage = '';
         
+        console.log('Total lines found:', lines.length);
+
         for (let i = 0; i < Math.min(lines.length, instructions.numberOfLines); i++) {
             const line = lines[i];
-            const firstLetter = line.match(/[a-zA-Z]/);
-            if (firstLetter) {
-                decodedMessage += firstLetter[0].toLowerCase();
+            console.log(`Line ${i}: "${line}"`);
+            
+            // Find the first alphabetic character (exactly like encoding does)
+            let firstLetterIndex = -1;
+            for (let j = 0; j < line.length; j++) {
+                if (line[j].match(/[a-zA-Z]/)) {
+                    firstLetterIndex = j;
+                    break;
+                }
+            }
+            
+            if (firstLetterIndex !== -1) {
+                const char = line[firstLetterIndex];
+                decodedMessage += char.toLowerCase();
+                console.log(`Line ${i}: First letter at position ${firstLetterIndex} = '${char}'`);
+            } else {
+                console.warn(`Line ${i}: No letters found`);
             }
         }
+        
+        console.log('Final decoded message:', decodedMessage);
+        console.log('=== END ACROSTIC DECODING ===');
         
         return decodedMessage;
     }
 
     decodePunctuation(text, instructions) {
-        let binaryString = '';
+        console.log('=== PUNCTUATION DECODING DEBUG ===');
+        console.log('Expected binary length:', instructions.binaryLength);
         
-        for (let char of text) {
-            if (char === '.') binaryString += '0';
-            else if (char === '!') binaryString += '1';
+        let binaryString = '';
+        let punctuationPositions = [];
+        
+        // Extract all punctuation marks in order (exactly like encoding)
+        for (let i = 0; i < text.length; i++) {
+            const char = text[i];
+            if (char === '.') {
+                binaryString += '0';
+                punctuationPositions.push({pos: i, char: '.', bit: '0'});
+            } else if (char === '!') {
+                binaryString += '1';
+                punctuationPositions.push({pos: i, char: '!', bit: '1'});
+            }
         }
+        
+        console.log('Punctuation marks found:', punctuationPositions.length);
+        console.log('Binary string:', binaryString);
+        console.log('First 10 punctuation positions:', punctuationPositions.slice(0, 10));
         
         // Convert binary to text
         let decodedMessage = '';
         for (let i = 0; i < binaryString.length; i += 8) {
-            const byte = binaryString.substr(i, 8);
+            const byte = binaryString.slice(i, i + 8);
             if (byte.length === 8) {
                 const charCode = parseInt(byte, 2);
-                if (charCode > 0) {
-                    decodedMessage += String.fromCharCode(charCode);
+                if (charCode > 0 && charCode < 128) { // Valid ASCII
+                    const char = String.fromCharCode(charCode);
+                    decodedMessage += char;
+                    console.log(`Byte ${Math.floor(i/8)}: ${byte} = ${charCode} = '${char}'`);
+                } else {
+                    console.warn(`Invalid character code: ${charCode} from byte: ${byte}`);
+                    break; // Stop if we hit invalid data
                 }
             }
         }
+        
+        console.log('Final decoded message:', decodedMessage);
+        console.log('=== END PUNCTUATION DECODING ===');
         
         return decodedMessage;
     }
 
     decodeNullCipher(text, instructions) {
-        const words = text.split(/\s+/);
+        console.log('=== NULL CIPHER DECODING DEBUG ===');
+        console.log('Number of words needed:', instructions.numberOfWords);
+        
+        const words = text.split(/\s+/).filter(word => word.length > 0);
         let decodedMessage = '';
         
+        console.log('Total words found:', words.length);
+
         for (let i = 0; i < Math.min(words.length, instructions.numberOfWords); i++) {
             const word = words[i];
-            const firstLetter = word.match(/[a-zA-Z]/);
-            if (firstLetter) {
-                decodedMessage += firstLetter[0].toLowerCase();
+            console.log(`Word ${i}: "${word}"`);
+            
+            // Find the first alphabetic character (exactly like encoding does)
+            let firstLetterIndex = -1;
+            for (let j = 0; j < word.length; j++) {
+                if (word[j].match(/[a-zA-Z]/)) {
+                    firstLetterIndex = j;
+                    break;
+                }
+            }
+            
+            if (firstLetterIndex !== -1) {
+                const char = word[firstLetterIndex];
+                decodedMessage += char.toLowerCase();
+                console.log(`Word ${i}: First letter at position ${firstLetterIndex} = '${char}'`);
+            } else {
+                console.warn(`Word ${i}: No letters found`);
             }
         }
+
+        console.log('Final decoded message:', decodedMessage);
+        console.log('=== END NULL CIPHER DECODING ===');
         
         return decodedMessage;
     }
