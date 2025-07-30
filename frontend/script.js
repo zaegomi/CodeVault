@@ -1,14 +1,16 @@
-// CodeVault Steganography Engine
+// CodeVault Steganography Engine with AI Integration
 class CodeVault {
     constructor() {
         this.initializeEventListeners();
         this.currentResult = null;
         this.currentMethod = null;
         this.decodingInstructions = null;
+        this.backendUrl = 'http://localhost:3001';
+        this.checkBackendConnection();
     }
 
     initializeEventListeners() {
-        // Main action buttons
+        // Original event listeners
         document.getElementById('startBtn').addEventListener('click', () => this.processMessage());
         document.getElementById('fileUpload').addEventListener('change', (e) => this.handleFileUpload(e));
         document.getElementById('copyBtn').addEventListener('click', () => this.copyResult());
@@ -16,83 +18,215 @@ class CodeVault {
         document.getElementById('decodeBtn').addEventListener('click', () => this.testDecode());
         document.getElementById('resetBtn').addEventListener('click', () => this.resetApp());
 
-        // AI Generation button
-        const generateBtn = document.getElementById('generateCarrierBtn');
-        if (generateBtn) {
-            generateBtn.addEventListener('click', () => this.generateCarrierText());
-        }
-
-        // Radio button event listeners with direct element targeting
-        const manualRadio = document.getElementById('manualRadio');
-        const generatedRadio = document.getElementById('generatedRadio');
-        
-        if (manualRadio) {
-            manualRadio.addEventListener('change', () => {
-                if (manualRadio.checked) {
-                    this.toggleCarrierMethod('manual');
-                }
-            });
-        }
-        
-        if (generatedRadio) {
-            generatedRadio.addEventListener('change', () => {
-                if (generatedRadio.checked) {
-                    this.toggleCarrierMethod('generated');
-                }
-            });
-        }
+        // NEW: AI text generation listener
+        document.getElementById('generateAIText').addEventListener('click', () => this.generateAICarrierText());
 
         // Real-time validation
         document.getElementById('secretMessage').addEventListener('input', () => this.validateInputs());
-        document.getElementById('carrierText').addEventListener('input', () => this.validateInputs());
-        
-        const generatedTextArea = document.getElementById('generatedCarrierText');
-        if (generatedTextArea) {
-            generatedTextArea.addEventListener('input', () => this.validateInputs());
-        }
-        
-        // Initialize with manual method selected
-        this.toggleCarrierMethod('manual');
+        document.getElementById('carrierText').addEventListener('input', () => {
+            this.validateInputs();
+            this.analyzeText();
+        });
+
+        // NEW: AI parameter change listeners
+        document.getElementById('encryptionMethod').addEventListener('change', () => this.updateAIRecommendations());
+        document.getElementById('secretMessage').addEventListener('input', () => this.updateAIRecommendations());
     }
 
-    toggleCarrierMethod(method) {
-        console.log('Toggling to method:', method);
+    async checkBackendConnection() {
+        try {
+            const response = await fetch(`${this.backendUrl}/api/health`);
+            const data = await response.json();
+            
+            if (data.status === 'OK') {
+                this.showBackendStatus('connected', data.openai_configured);
+            }
+        } catch (error) {
+            this.showBackendStatus('disconnected');
+            console.warn('Backend not available, using frontend-only mode');
+        }
+    }
+
+    showBackendStatus(status, aiConfigured = false) {
+        const aiBtn = document.getElementById('generateAIText');
+        if (status === 'connected') {
+            aiBtn.disabled = false;
+            if (aiConfigured) {
+                aiBtn.innerHTML = '🚀 Generate AI Carrier Text';
+                aiBtn.title = 'AI text generation available';
+            } else {
+                aiBtn.innerHTML = '🤖 Generate Template Text';
+                aiBtn.title = 'Backend available but OpenAI not configured - using fallback generation';
+            }
+        } else {
+            aiBtn.disabled = true;
+            aiBtn.innerHTML = '⚠️ Backend Required';
+            aiBtn.title = 'Backend server not available';
+        }
+    }
+
+    updateAIRecommendations() {
+        const method = document.getElementById('encryptionMethod').value;
+        const messageLength = document.getElementById('secretMessage').value.length;
+        const lengthInput = document.getElementById('aiLength');
         
-        const manualSection = document.getElementById('manualCarrierSection');
-        const generatedSection = document.getElementById('generatedCarrierSection');
+        // Update recommended length based on method and message
+        let recommendedLength = Math.max(200, messageLength * 5);
         
-        if (!manualSection || !generatedSection) {
-            console.error('Could not find carrier sections');
+        switch (method) {
+            case 'els':
+                recommendedLength = Math.max(300, messageLength * 8);
+                break;
+            case 'acrostic':
+                recommendedLength = Math.max(150, messageLength * 6);
+                break;
+            case 'punctuation':
+                recommendedLength = Math.max(250, messageLength * 10);
+                break;
+            case 'null':
+                recommendedLength = Math.max(messageLength * 4, 100);
+                break;
+        }
+        
+        lengthInput.value = Math.min(recommendedLength, 1000);
+    }
+
+    async generateAICarrierText() {
+        const secretMessage = document.getElementById('secretMessage').value.trim();
+        const topic = document.getElementById('aiTopic').value.trim();
+        const method = document.getElementById('encryptionMethod').value;
+        const style = document.getElementById('aiStyle').value;
+        const length = parseInt(document.getElementById('aiLength').value);
+
+        // Validation
+        if (!secretMessage) {
+            this.showError('Please enter a secret message first');
             return;
         }
-        
-        if (method === 'manual') {
-            manualSection.style.display = 'block';
-            generatedSection.style.display = 'none';
-            console.log('Switched to manual input');
-        } else {
-            manualSection.style.display = 'none';
-            generatedSection.style.display = 'block';
-            console.log('Switched to AI generated');
+
+        if (!topic) {
+            this.showError('Please enter a topic for the carrier text');
+            return;
         }
+
+        // Show loading
+        const aiLoadingDiv = document.getElementById('aiLoadingDiv');
+        const generateBtn = document.getElementById('generateAIText');
         
-        this.validateInputs();
+        aiLoadingDiv.classList.remove('hidden');
+        generateBtn.disabled = true;
+        generateBtn.classList.add('loading');
+
+        try {
+            const response = await fetch(`${this.backendUrl}/api/generate-carrier-text`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    message: secretMessage,
+                    topic: topic,
+                    method: method,
+                    style: style,
+                    length: length
+                })
+            });
+
+            if (!response.ok) {
+                const errorData = await response.json();
+                throw new Error(errorData.error || 'Failed to generate text');
+            }
+
+            const data = await response.json();
+            
+            // Set the generated text
+            document.getElementById('carrierText').value = data.carrierText;
+            
+            // Show success message with metadata
+            const source = data.metadata.source === 'openai' ? 'AI-generated' : 'Template-based';
+            this.showSuccess(`${source} carrier text generated successfully! (${data.metadata.actualWordCount} words)`);
+            
+            // Update text analysis
+            this.analyzeText();
+            this.validateInputs();
+
+            // Log metadata for debugging
+            console.log('Generated text metadata:', data.metadata);
+
+        } catch (error) {
+            console.error('AI generation error:', error);
+            this.showError(`Failed to generate carrier text: ${error.message}`);
+        } finally {
+            aiLoadingDiv.classList.add('hidden');
+            generateBtn.disabled = false;
+            generateBtn.classList.remove('loading');
+        }
+    }
+
+    analyzeText() {
+        const carrierText = document.getElementById('carrierText').value;
+        const method = document.getElementById('encryptionMethod').value;
+        const secretMessage = document.getElementById('secretMessage').value;
+        
+        if (!carrierText) {
+            document.getElementById('textAnalysis').classList.add('hidden');
+            return;
+        }
+
+        const words = carrierText.split(/\s+/).filter(word => word.length > 0);
+        const chars = carrierText.length;
+        const letters = carrierText.replace(/[^a-zA-Z]/g, '').length;
+        
+        // Calculate suitability for current method
+        let suitability = 'Good';
+        let suitabilityClass = 'good';
+        
+        switch (method) {
+            case 'els':
+                if (letters < secretMessage.length * 3) {
+                    suitability = 'Too Short';
+                    suitabilityClass = 'poor';
+                } else if (letters < secretMessage.length * 5) {
+                    suitability = 'Adequate';
+                    suitabilityClass = 'fair';
+                }
+                break;
+            case 'acrostic':
+                const lines = carrierText.split('\n').length;
+                if (lines < secretMessage.length) {
+                    suitability = 'Need More Lines';
+                    suitabilityClass = 'poor';
+                }
+                break;
+            case 'punctuation':
+                const punctuation = (carrierText.match(/[.!]/g) || []).length;
+                if (punctuation < secretMessage.length * 4) {
+                    suitability = 'Need More Punctuation';
+                    suitabilityClass = 'fair';
+                }
+                break;
+            case 'null':
+                if (words.length < secretMessage.length) {
+                    suitability = 'Too Few Words';
+                    suitabilityClass = 'poor';
+                }
+                break;
+        }
+
+        // Update display
+        document.getElementById('wordCount').textContent = words.length;
+        document.getElementById('charCount').textContent = chars;
+        document.getElementById('suitability').textContent = suitability;
+        document.getElementById('suitability').className = `analysis-value ${suitabilityClass}`;
+        document.getElementById('textAnalysis').classList.remove('hidden');
     }
 
     validateInputs() {
         const secretMessage = document.getElementById('secretMessage').value.trim();
-        const carrierMethod = document.querySelector('input[name="carrierMethod"]:checked').value;
+        const carrierText = document.getElementById('carrierText').value.trim();
         const startBtn = document.getElementById('startBtn');
-        
-        let hasCarrierText = false;
-        
-        if (carrierMethod === 'manual') {
-            hasCarrierText = document.getElementById('carrierText').value.trim().length > 0;
-        } else {
-            hasCarrierText = document.getElementById('generatedCarrierText').value.trim().length > 0;
-        }
 
-        if (secretMessage.length > 0 && hasCarrierText) {
+        if (secretMessage.length > 0 && carrierText.length > 0) {
             startBtn.disabled = false;
         } else {
             startBtn.disabled = true;
@@ -120,6 +254,7 @@ class CodeVault {
             reader.onload = (e) => {
                 document.getElementById('carrierText').value = e.target.result;
                 this.validateInputs();
+                this.analyzeText();
                 this.showSuccess('File uploaded successfully!');
             };
             reader.readAsText(file);
@@ -128,224 +263,10 @@ class CodeVault {
         }
     }
 
-    async generateCarrierText() {
-        console.log('=== GENERATE CARRIER TEXT CLICKED ===');
-        
-        const secretMessage = document.getElementById('secretMessage').value.trim();
-        console.log('Secret message:', secretMessage);
-        
-        if (!secretMessage) {
-            this.showError('Please enter a secret message first');
-            return;
-        }
-
-        const topic = document.getElementById('carrierTopic').value;
-        const length = document.getElementById('carrierLength').value;
-        const style = document.getElementById('carrierStyle').value;
-        const method = document.getElementById('encryptionMethod').value;
-        
-        console.log('Generation parameters:', { topic, length, style, method });
-        
-        const generateBtn = document.getElementById('generateCarrierBtn');
-        const textArea = document.getElementById('generatedCarrierText');
-        
-        if (!generateBtn || !textArea) {
-            console.error('Missing UI elements:', { generateBtn, textArea });
-            this.showError('UI elements not found. Please refresh the page.');
-            return;
-        }
-        
-        const originalText = generateBtn.textContent;
-        
-        // Show loading state
-        generateBtn.disabled = true;
-        generateBtn.textContent = '🔄 Generating...';
-        
-        try {
-            console.log('Starting text generation...');
-            
-            // Use simplified generation for now
-            const generatedText = this.generateSimpleCarrierText(secretMessage, topic, length, method);
-            
-            console.log('Generated text length:', generatedText.length);
-            console.log('Generated text preview:', generatedText.substring(0, 200) + '...');
-            
-            textArea.value = generatedText;
-            
-            this.validateInputs();
-            this.showSuccess('Carrier text generated successfully! Optimized for your secret message.');
-            
-        } catch (error) {
-            console.error('Generation error:', error);
-            this.showError('Failed to generate carrier text: ' + error.message);
-        } finally {
-            generateBtn.disabled = false;
-            generateBtn.textContent = originalText;
-        }
-    }
-
-    generateSimpleCarrierText(secretMessage, topic, length, method) {
-        console.log('Generating simple carrier text for method:', method);
-        
-        const cleanMessage = secretMessage.toLowerCase().replace(/[^a-z]/g, '');
-        const wordCounts = { 'short': 300, 'medium': 600, 'long': 1000 };
-        const targetWords = wordCounts[length] || 600;
-        
-        // Topic-specific content
-        const topicContent = {
-            technology: {
-                intro: "In today's rapidly evolving technological landscape, artificial intelligence and machine learning continue to revolutionize how we approach complex problems.",
-                sentences: [
-                    "Advanced algorithms demonstrate remarkable capabilities in processing vast amounts of data efficiently.",
-                    "Software development methodologies have evolved to incorporate agile practices and continuous integration.",
-                    "Cloud computing infrastructure provides scalable solutions for modern business requirements.",
-                    "Cybersecurity measures protect critical systems from emerging threats and vulnerabilities.",
-                    "Digital transformation initiatives drive innovation across multiple industry sectors.",
-                    "Machine learning models enable predictive analytics and automated decision-making processes.",
-                    "Technology platforms facilitate seamless collaboration and communication worldwide.",
-                    "Data science techniques reveal valuable insights from complex information patterns."
-                ]
-            },
-            business: {
-                intro: "Strategic business development requires comprehensive analysis of market conditions and organizational capabilities.",
-                sentences: [
-                    "Market research provides essential insights into customer preferences and competitive landscapes.",
-                    "Financial planning ensures sustainable growth and effective resource allocation strategies.",
-                    "Leadership development programs enhance organizational performance and employee engagement.",
-                    "Supply chain optimization improves efficiency and reduces operational costs significantly.",
-                    "Customer relationship management systems strengthen brand loyalty and retention rates.",
-                    "Performance metrics guide decision-making processes and strategic planning initiatives.",
-                    "Innovation strategies drive competitive advantage in dynamic market environments.",
-                    "Stakeholder engagement promotes transparency and collaborative business relationships."
-                ]
-            },
-            science: {
-                intro: "Scientific research methodologies provide rigorous frameworks for investigation and discovery across multiple disciplines.",
-                sentences: [
-                    "Experimental design ensures reliable data collection and statistical validity in research studies.",
-                    "Peer review processes maintain quality standards and scientific integrity in publications.",
-                    "Hypothesis testing enables systematic evaluation of theoretical predictions and observations.",
-                    "Data analysis techniques reveal patterns and correlations within complex datasets.",
-                    "Research collaboration facilitates knowledge sharing and interdisciplinary discoveries.",
-                    "Laboratory protocols ensure reproducibility and accuracy in experimental procedures.",
-                    "Scientific communication bridges the gap between research findings and practical applications.",
-                    "Evidence-based conclusions support informed decision-making in policy and practice."
-                ]
-            },
-            education: {
-                intro: "Educational methodologies continue to evolve with advances in learning theory and instructional technology.",
-                sentences: [
-                    "Student-centered approaches enhance engagement and promote active learning experiences.",
-                    "Assessment strategies provide valuable feedback on learning progress and achievement.",
-                    "Curriculum development aligns educational objectives with real-world applications.",
-                    "Technology integration supports diverse learning styles and accessibility requirements.",
-                    "Professional development opportunities enhance teaching effectiveness and student outcomes.",
-                    "Learning analytics provide insights into educational patterns and improvement opportunities.",
-                    "Collaborative learning environments foster critical thinking and communication skills.",
-                    "Educational research informs evidence-based practices in teaching and learning."
-                ]
-            },
-            general: {
-                intro: "Contemporary analysis of complex systems reveals important patterns and relationships that inform our understanding.",
-                sentences: [
-                    "Comprehensive examination of available evidence provides valuable insights and perspectives.",
-                    "Systematic investigation demonstrates the importance of methodical approaches to problem-solving.",
-                    "Detailed analysis reveals significant trends and developments in various fields.",
-                    "Evidence-based conclusions support informed decision-making and strategic planning.",
-                    "Thorough evaluation of multiple factors ensures comprehensive understanding of complex issues.",
-                    "Research findings contribute to expanding knowledge and practical applications.",
-                    "Professional standards guide quality assurance and best practices in various industries.",
-                    "Collaborative efforts enhance outcomes and promote shared understanding of challenges."
-                ]
-            }
-        };
-        
-        const content = topicContent[topic] || topicContent.general;
-        let text = content.intro + ' ';
-        
-        // Add sentences based on method requirements
-        if (method === 'acrostic') {
-            // For acrostic, create lines that start with message letters
-            const lines = [];
-            for (let i = 0; i < cleanMessage.length; i++) {
-                const char = cleanMessage[i].toUpperCase();
-                const sentence = content.sentences[i % content.sentences.length];
-                lines.push(char + sentence.substring(1));
-            }
-            return lines.join('\n');
-        }
-        
-        // For other methods, generate flowing text
-        while (this.countWords(text) < targetWords) {
-            const sentence = content.sentences[Math.floor(Math.random() * content.sentences.length)];
-            text += sentence + ' ';
-            
-            // Add paragraph breaks occasionally
-            if (Math.random() > 0.7 && this.countWords(text) > 100) {
-                text += '\n\n';
-            }
-        }
-        
-        // Method-specific optimizations
-        if (method === 'punctuation') {
-            text = this.addStrategicPunctuation(text);
-        } else if (method === 'els') {
-            text = this.optimizeForELS(text, cleanMessage);
-        }
-        
-        return text.trim();
-    }
-
-    addStrategicPunctuation(text) {
-        // Add periods and exclamation marks strategically
-        return text.replace(/\./g, Math.random() > 0.5 ? '.' : '!')
-                  .replace(/,/g, Math.random() > 0.8 ? '. ' : ', ');
-    }
-
-    optimizeForELS(text, message) {
-        // Ensure enough instances of each letter
-        for (let char of message) {
-            if (char.match(/[a-z]/)) {
-                const count = (text.toLowerCase().match(new RegExp(char, 'g')) || []).length;
-                if (count < 5) {
-                    const words = this.getWordsWithLetter(char);
-                    text += ` Additional ${words[0]} analysis demonstrates ${words[1]} outcomes. `;
-                }
-            }
-        }
-        return text;
-    }
-
-    getWordsWithLetter(letter) {
-        const letterWords = {
-            'a': ['advanced', 'analysis'], 'b': ['beneficial', 'business'], 'c': ['comprehensive', 'critical'],
-            'd': ['detailed', 'development'], 'e': ['effective', 'evaluation'], 'f': ['fundamental', 'framework'],
-            'g': ['general', 'growth'], 'h': ['however', 'highlighted'], 'i': ['important', 'implementation'],
-            'j': ['justified', 'joint'], 'k': ['knowledge', 'key'], 'l': ['logical', 'learning'],
-            'm': ['methodology', 'modern'], 'n': ['necessary', 'natural'], 'o': ['outcomes', 'optimal'],
-            'p': ['process', 'performance'], 'q': ['quality', 'questions'], 'r': ['research', 'results'],
-            's': ['systematic', 'significant'], 't': ['theoretical', 'techniques'], 'u': ['understanding', 'useful'],
-            'v': ['valuable', 'various'], 'w': ['work', 'widespread'], 'x': ['examined', 'experience'],
-            'y': ['years', 'yield'], 'z': ['zero', 'zones']
-        };
-        return letterWords[letter] || ['additional', 'analysis'];
-    }
-
-    countWords(text) {
-        return text.trim().split(/\s+/).filter(word => word.length > 0).length;
-    }
-
     async processMessage() {
         const secretMessage = document.getElementById('secretMessage').value.trim();
-        const carrierMethod = document.querySelector('input[name="carrierMethod"]:checked').value;
+        const carrierText = document.getElementById('carrierText').value.trim();
         const method = document.getElementById('encryptionMethod').value;
-        
-        let carrierText;
-        if (carrierMethod === 'manual') {
-            carrierText = document.getElementById('carrierText').value.trim();
-        } else {
-            carrierText = document.getElementById('generatedCarrierText').value.trim();
-        }
 
         if (!secretMessage || !carrierText) {
             this.showError('Please enter both secret message and carrier text');
@@ -362,7 +283,34 @@ class CodeVault {
         document.getElementById('resultsDiv').classList.add('hidden');
         document.getElementById('startBtn').disabled = true;
 
-        // Simulate processing delay for better UX
+        // Try backend first, fallback to frontend
+        try {
+            const response = await fetch(`${this.backendUrl}/api/encode`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    message: secretMessage,
+                    carrierText: carrierText,
+                    method: method
+                })
+            });
+
+            if (response.ok) {
+                const data = await response.json();
+                this.currentResult = data.result.encodedText;
+                this.currentMethod = method;
+                this.decodingInstructions = data.result.instructions;
+                this.displayResults(data.result);
+                this.showSuccess('Message encoded successfully using backend!');
+                return;
+            }
+        } catch (error) {
+            console.warn('Backend encoding failed, using frontend fallback:', error);
+        }
+
+        // Fallback to frontend encoding
         await new Promise(resolve => setTimeout(resolve, 1000));
 
         try {
@@ -382,13 +330,6 @@ class CodeVault {
                     break;
                 default:
                     throw new Error('Invalid encoding method');
-            }
-
-            // Add carrier generation info to result
-            if (carrierMethod === 'generated') {
-                result.generatedCarrier = true;
-                result.carrierTopic = document.getElementById('carrierTopic').value;
-                result.carrierStyle = document.getElementById('carrierStyle').value;
             }
 
             this.currentResult = result.encodedText;
@@ -415,9 +356,10 @@ class CodeVault {
         }
 
         if (cleanCarrier.length < cleanMessage.length * 2) {
-            throw new Error(`Carrier text too short for ELS encoding. Need at least ${cleanMessage.length * 2} letters, but only have ${cleanCarrier.length}.`);
+            throw new Error('Carrier text too short for ELS encoding. Need at least ' + (cleanMessage.length * 2) + ' letters.');
         }
 
+        // Calculate optimal skip distance
         const skipDistance = Math.floor(cleanCarrier.length / cleanMessage.length);
         
         if (skipDistance < 2) {
@@ -428,15 +370,18 @@ class CodeVault {
         let positions = [];
         let currentPos = 0;
 
+        // Place message characters at calculated intervals
         for (let i = 0; i < cleanMessage.length; i++) {
             const targetChar = cleanMessage[i];
             let placed = false;
             
+            // Try to find position within skip distance
             for (let j = 0; j < skipDistance && !placed; j++) {
                 const pos = currentPos + j;
                 if (pos < encodedText.length) {
                     const originalChar = encodedText[pos].toLowerCase();
                     if (originalChar.match(/[a-z]/)) {
+                        // Replace with target character, preserving case
                         const isUpperCase = encodedText[pos] === encodedText[pos].toUpperCase();
                         encodedText = encodedText.substring(0, pos) + 
                                      (isUpperCase ? targetChar.toUpperCase() : targetChar) + 
@@ -446,6 +391,7 @@ class CodeVault {
                     }
                 }
             }
+            
             currentPos += skipDistance;
         }
 
@@ -474,8 +420,10 @@ class CodeVault {
             throw new Error('Secret message must contain at least one letter');
         }
 
+        // Split carrier text into lines - be more conservative about line breaks
         let lines = carrierText.split('\n').filter(line => line.trim().length > 0);
         
+        // If no line breaks exist, try to split at sentence boundaries
         if (lines.length === 1 && lines[0].length > 100) {
             const sentences = lines[0].split(/(?<=[.!?])\s+/);
             if (sentences.length >= cleanMessage.length) {
@@ -483,11 +431,13 @@ class CodeVault {
             }
         }
         
+        // If still not enough lines, split the text more intelligently
         if (lines.length < cleanMessage.length) {
             let newLines = [];
             
             for (let line of lines) {
                 if (line.length > 80 && newLines.length < cleanMessage.length) {
+                    // Split at natural break points: commas, semicolons, conjunctions
                     const breakPoints = line.split(/(?:,\s+|;\s+|\s+and\s+|\s+but\s+|\s+or\s+|\s+so\s+)/);
                     
                     if (breakPoints.length > 1) {
@@ -509,8 +459,11 @@ class CodeVault {
             lines = newLines;
         }
         
+        // Only add minimal lines if absolutely necessary
         if (lines.length < cleanMessage.length) {
             const needed = cleanMessage.length - lines.length;
+            
+            // Add contextually relevant short lines
             const contextualLines = [
                 'Hence the conclusion.',
                 'Therefore we see.',
@@ -528,8 +481,10 @@ class CodeVault {
             }
         }
 
+        // Trim to exactly what we need
         lines = lines.slice(0, cleanMessage.length);
 
+        // Modify first letter of each line to match the secret message
         let encodedLines = [];
         let modificationsCount = 0;
         
@@ -537,6 +492,7 @@ class CodeVault {
             const targetChar = cleanMessage[i];
             let line = lines[i] || '';
             
+            // Find the first alphabetic character and its position
             let firstLetterIndex = -1;
             for (let j = 0; j < line.length; j++) {
                 if (line[j].match(/[a-zA-Z]/)) {
@@ -550,11 +506,13 @@ class CodeVault {
                 const isUpperCase = originalChar === originalChar.toUpperCase();
                 const newChar = isUpperCase ? targetChar.toUpperCase() : targetChar;
                 
+                // Only modify if different
                 if (originalChar.toLowerCase() !== targetChar) {
                     line = line.substring(0, firstLetterIndex) + newChar + line.substring(firstLetterIndex + 1);
                     modificationsCount++;
                 }
             } else {
+                // No letters found - prepend the target character naturally
                 line = targetChar.toUpperCase() + (line.length > 0 ? ' ' + line : '.');
                 modificationsCount++;
             }
@@ -586,6 +544,7 @@ class CodeVault {
             throw new Error('Secret message cannot be empty');
         }
 
+        // Convert message to binary with detailed logging
         const binaryMessage = message.split('').map(char => {
             const binary = char.charCodeAt(0).toString(2).padStart(8, '0');
             return { char: char, ascii: char.charCodeAt(0), binary: binary };
@@ -598,6 +557,7 @@ class CodeVault {
         let modifications = [];
         let existingPunctuation = [];
         
+        // First pass: catalog and replace existing punctuation
         for (let i = 0; i < encodedText.length; i++) {
             const char = encodedText[i];
             if (char === '.' || char === '!') {
@@ -609,6 +569,7 @@ class CodeVault {
             }
         }
         
+        // Replace existing punctuation with binary pattern
         let newText = '';
         for (let i = 0; i < encodedText.length && binaryIndex < fullBinary.length; i++) {
             const char = encodedText[i];
@@ -635,29 +596,52 @@ class CodeVault {
         encodedText = newText;
         let addedPunctuation = [];
 
+        // Second pass: add punctuation if needed
         if (binaryIndex < fullBinary.length) {
             const remainingBinary = fullBinary.substring(binaryIndex);
-            const sentences = encodedText.split(/(?<=[.!?])\s+/);
+            
+            // Find sentence boundaries for natural insertion
+            const sentencePattern = /([.!?])\s+/g;
+            const sentences = [];
+            let lastIndex = 0;
+            let match;
+            
+            while ((match = sentencePattern.exec(encodedText)) !== null) {
+                sentences.push({
+                    end: match.index + match[0].length,
+                    punctuation: match[1]
+                });
+            }
+            
+            // Insert remaining binary at sentence boundaries
             let insertionsMade = 0;
             let modifiedText = encodedText;
             
             for (let i = 0; i < remainingBinary.length && insertionsMade < sentences.length; i++) {
                 const binaryDigit = remainingBinary[i];
                 const punctuation = binaryDigit === '0' ? '.' : '!';
+                const insertPos = sentences[insertionsMade].end;
                 
-                modifiedText += punctuation;
+                modifiedText = modifiedText.substring(0, insertPos) + punctuation + modifiedText.substring(insertPos);
+                
                 addedPunctuation.push({
-                    position: modifiedText.length - 1,
+                    position: insertPos,
                     char: punctuation,
                     binaryIndex: binaryIndex + i,
                     represents: `${message[Math.floor((binaryIndex + i) / 8)] || 'overflow'} bit ${(binaryIndex + i) % 8}`
                 });
                 
                 insertionsMade++;
+                
+                // Adjust positions for subsequent insertions
+                for (let j = insertionsMade; j < sentences.length; j++) {
+                    sentences[j].end++;
+                }
             }
             
             encodedText = modifiedText;
             
+            // If still need more punctuation, add at the end with spacing
             if (insertionsMade < remainingBinary.length) {
                 const remaining = remainingBinary.substring(insertionsMade);
                 encodedText += ' ';
@@ -673,6 +657,7 @@ class CodeVault {
                         represents: `${message[Math.floor((binaryIndex + insertionsMade + i) / 8)] || 'overflow'} bit ${(binaryIndex + insertionsMade + i) % 8}`
                     });
                     
+                    // Add space every 8 bits for readability
                     if ((i + 1) % 8 === 0 && i < remaining.length - 1) {
                         encodedText += ' ';
                     }
@@ -714,6 +699,7 @@ class CodeVault {
             throw new Error('Secret message must contain at least one letter');
         }
 
+        // Split into words and analyze them
         let words = carrierText.split(/\s+/).filter(word => word.length > 0);
         let wordAnalysis = words.map((word, index) => ({
             index: index,
@@ -725,7 +711,10 @@ class CodeVault {
         }));
         
         if (words.length < cleanMessage.length) {
+            // Calculate how many words we need to add
             const wordsNeeded = cleanMessage.length - words.length;
+            
+            // Add contextually appropriate filler words
             const contextualFillers = [
                 'also', 'thus', 'then', 'here', 'there', 'when', 'where', 'while',
                 'since', 'though', 'still', 'yet', 'just', 'quite', 'rather', 'very',
@@ -750,6 +739,7 @@ class CodeVault {
         let encodedWords = [...words];
         let modifications = [];
         
+        // Modify first letter of selected words to spell out the message
         for (let i = 0; i < cleanMessage.length; i++) {
             const targetChar = cleanMessage[i];
             const wordInfo = wordAnalysis[i];
@@ -761,6 +751,7 @@ class CodeVault {
                 const isUpperCase = originalChar === originalChar.toUpperCase();
                 const newChar = isUpperCase ? targetChar.toUpperCase() : targetChar;
                 
+                // Only modify if the letter is different
                 if (originalChar.toLowerCase() !== targetChar) {
                     const newWord = word.substring(0, firstLetterIndex) + 
                                    newChar + 
@@ -779,6 +770,7 @@ class CodeVault {
                     });
                 }
             } else {
+                // No letters in word - create a minimal word starting with target character
                 const newWord = targetChar.toLowerCase() + 'nd';
                 encodedWords[i] = newWord;
                 modifications.push({
@@ -795,6 +787,7 @@ class CodeVault {
             }
         }
 
+        // Calculate encoding statistics
         const totalWords = encodedWords.length;
         const wordsUsed = cleanMessage.length;
         const wordsUnchanged = totalWords - modifications.length;
@@ -830,15 +823,17 @@ class CodeVault {
     calculateSecurityScore(messageLength, carrierLength, method) {
         let baseScore = 50;
         
+        // Length ratio factor
         const ratio = messageLength / carrierLength;
         if (ratio < 0.01) baseScore += 30;
         else if (ratio < 0.05) baseScore += 20;
         else if (ratio < 0.1) baseScore += 10;
         else baseScore -= 10;
         
+        // Method-specific adjustments
         switch (method) {
             case 'els':
-                baseScore += 20;
+                baseScore += 20; // ELS is more secure
                 break;
             case 'punctuation':
                 baseScore += 15;
@@ -847,7 +842,7 @@ class CodeVault {
                 baseScore += 10;
                 break;
             case 'acrostic':
-                baseScore += 5;
+                baseScore += 5; // Acrostic is more obvious
                 break;
         }
         
@@ -961,6 +956,7 @@ class CodeVault {
             else if (char === '!') binaryString += '1';
         }
         
+        // Convert binary to text
         let decodedMessage = '';
         for (let i = 0; i < binaryString.length; i += 8) {
             const byte = binaryString.substr(i, 8);
@@ -993,14 +989,15 @@ class CodeVault {
     resetApp() {
         document.getElementById('secretMessage').value = '';
         document.getElementById('carrierText').value = '';
-        document.getElementById('generatedCarrierText').value = '';
         document.getElementById('encryptionMethod').value = 'els';
         document.getElementById('fileUpload').value = '';
-        document.querySelector('input[name="carrierMethod"][value="manual"]').checked = true;
-        this.toggleCarrierMethod('manual');
+        document.getElementById('aiTopic').value = 'technology';
+        document.getElementById('aiStyle').value = 'casual';
+        document.getElementById('aiLength').value = '200';
         document.getElementById('resultsDiv').classList.add('hidden');
         document.getElementById('errorDiv').classList.add('hidden');
         document.getElementById('successDiv').classList.add('hidden');
+        document.getElementById('textAnalysis').classList.add('hidden');
         document.getElementById('startBtn').disabled = true;
         
         this.currentResult = null;
@@ -1008,283 +1005,6 @@ class CodeVault {
         this.decodingInstructions = null;
         
         this.showSuccess('Application reset successfully!');
-    }
-}
-
-// AI Carrier Text Generator Class
-class CarrierTextGenerator {
-    constructor(topic, style, length) {
-        this.topic = topic;
-        this.style = style;
-        this.length = length;
-        this.templates = this.getTopicTemplates();
-        this.wordCount = this.getWordCount();
-    }
-
-    getWordCount() {
-        const counts = {
-            'short': 300,
-            'medium': 600,
-            'long': 1000,
-            'custom': parseInt(document.getElementById('customWordCount')?.value || 600)
-        };
-        return counts[this.length] || 600;
-    }
-
-    getTopicTemplates() {
-        const templates = {
-            technology: {
-                themes: ['artificial intelligence', 'software development', 'cybersecurity', 'data science', 'cloud computing'],
-                vocabulary: ['innovation', 'algorithm', 'implementation', 'optimization', 'integration', 'architecture'],
-                sentences: [
-                    'Advanced technology solutions demonstrate remarkable capabilities in modern applications.',
-                    'Digital transformation initiatives continue to reshape business operations worldwide.',
-                    'Machine learning algorithms provide sophisticated analytical capabilities for complex problems.',
-                    'Cloud computing infrastructure enables scalable and efficient resource management.',
-                    'Cybersecurity measures protect critical systems from potential threats and vulnerabilities.'
-                ]
-            },
-            business: {
-                themes: ['strategic planning', 'market analysis', 'financial performance', 'organizational development'],
-                vocabulary: ['efficiency', 'profitability', 'stakeholder', 'optimization', 'synergy', 'leveraging'],
-                sentences: [
-                    'Strategic business initiatives drive sustainable growth and competitive advantage.',
-                    'Market analysis reveals significant opportunities for expansion and development.',
-                    'Financial performance indicators demonstrate consistent improvement across multiple sectors.',
-                    'Organizational excellence requires comprehensive planning and effective execution.',
-                    'Stakeholder engagement promotes collaborative decision-making and shared value creation.'
-                ]
-            },
-            science: {
-                themes: ['research methodology', 'experimental design', 'data analysis', 'scientific discovery'],
-                vocabulary: ['hypothesis', 'methodology', 'empirical', 'correlation', 'statistical', 'observation'],
-                sentences: [
-                    'Scientific research methodologies provide rigorous frameworks for investigation and analysis.',
-                    'Experimental designs enable systematic testing of hypotheses and theoretical predictions.',
-                    'Data analysis techniques reveal patterns and relationships within complex datasets.',
-                    'Peer review processes ensure quality and reliability in scientific publications.',
-                    'Research findings contribute to expanding knowledge and understanding in various fields.'
-                ]
-            },
-            education: {
-                themes: ['learning strategies', 'curriculum development', 'student engagement', 'educational technology'],
-                vocabulary: ['pedagogy', 'comprehension', 'analytical', 'critical thinking', 'knowledge'],
-                sentences: [
-                    'Educational methodologies enhance student learning and academic achievement.',
-                    'Curriculum development requires careful consideration of learning objectives and outcomes.',
-                    'Student engagement strategies promote active participation and knowledge retention.',
-                    'Assessment techniques provide valuable feedback on educational progress and effectiveness.',
-                    'Educational technology tools support innovative teaching and learning approaches.'
-                ]
-            },
-            general: {
-                themes: ['modern society', 'global perspective', 'contemporary issues', 'human experience'],
-                vocabulary: ['significant', 'important', 'relevant', 'comprehensive', 'effective', 'substantial'],
-                sentences: [
-                    'Contemporary analysis reveals important trends and developments in modern society.',
-                    'Comprehensive examination of current issues provides valuable insights and perspectives.',
-                    'Significant progress continues to shape our understanding of complex phenomena.',
-                    'Effective strategies demonstrate practical applications in various contexts and situations.',
-                    'Important considerations guide decision-making processes and strategic planning initiatives.'
-                ]
-            }
-        };
-        
-        return templates[this.topic] || templates.general;
-    }
-
-    generateELSOptimized(message) {
-        let text = this.createOpening();
-        const targetLetters = message.length * 15; // Ensure plenty of letters
-        
-        while (this.countLetters(text) < targetLetters || this.countWords(text) < this.wordCount) {
-            text += this.generateParagraph() + '\n\n';
-        }
-        
-        text += this.createClosing();
-        return this.optimizeForELS(text, message);
-    }
-
-    generateAcrosticOptimized(message) {
-        const lines = [];
-        
-        for (let i = 0; i < message.length; i++) {
-            const char = message[i];
-            lines.push(this.generateAcrosticLine(char));
-        }
-        
-        return lines.join('\n');
-    }
-
-    generatePunctuationOptimized(message) {
-        const bitsNeeded = message.length * 8;
-        let text = this.createOpening();
-        
-        while (this.countPunctuation(text) < bitsNeeded || this.countWords(text) < this.wordCount) {
-            text += this.generatePunctuationRichParagraph() + '\n\n';
-        }
-        
-        return text.trim();
-    }
-
-    generateNullCipherOptimized(message) {
-        const wordsNeeded = message.length * 3;
-        let text = '';
-        
-        while (this.countWords(text) < Math.max(wordsNeeded, this.wordCount)) {
-            text += this.generateWordRichParagraph() + '\n\n';
-        }
-        
-        return text.trim();
-    }
-
-    generateGeneral(message) {
-        let text = this.createOpening();
-        
-        while (this.countWords(text) < this.wordCount) {
-            text += this.generateParagraph() + '\n\n';
-        }
-        
-        text += this.createClosing();
-        return text;
-    }
-
-    createOpening() {
-        const openings = [
-            "In today's rapidly evolving landscape, comprehensive analysis reveals significant opportunities for advancement and development. ",
-            "Contemporary research demonstrates the importance of systematic approaches to complex challenges and emerging opportunities. ",
-            "Recent developments highlight the critical role of strategic thinking in addressing modern requirements and expectations. ",
-            "Advanced methodologies provide valuable frameworks for understanding complex systems and their practical applications. ",
-            "Systematic investigation reveals important patterns and relationships that inform effective decision-making processes. "
-        ];
-        
-        return openings[Math.floor(Math.random() * openings.length)];
-    }
-
-    createClosing() {
-        const closings = [
-            "These insights provide valuable guidance for future development and continued advancement in the field.",
-            "Ultimately, this analysis contributes to our broader understanding and practical application of these principles.",
-            "The implications of these findings extend beyond immediate applications and suggest promising research directions.",
-            "This comprehensive examination establishes important foundations for continued investigation and development.",
-            "These conclusions support evidence-based approaches to addressing complex challenges and opportunities."
-        ];
-        
-        return '\n\n' + closings[Math.floor(Math.random() * closings.length)];
-    }
-
-    generateParagraph() {
-        const sentences = this.templates.sentences;
-        const numSentences = Math.floor(Math.random() * 3) + 3; // 3-5 sentences
-        let paragraph = '';
-        
-        for (let i = 0; i < numSentences; i++) {
-            const sentence = sentences[Math.floor(Math.random() * sentences.length)];
-            paragraph += sentence + ' ';
-        }
-        
-        return paragraph.trim();
-    }
-
-    generateAcrosticLine(char) {
-        const word = this.templates.vocabulary[Math.floor(Math.random() * this.templates.vocabulary.length)];
-        const theme = this.templates.themes[Math.floor(Math.random() * this.templates.themes.length)];
-        
-        return `${char.toUpperCase()}dvanced research in ${theme} demonstrates ${word} and systematic progress.`;
-    }
-
-    generatePunctuationRichParagraph() {
-        const sentences = [
-            "This methodology offers several key advantages: efficiency, reliability, and comprehensive coverage.",
-            "Research findings demonstrate significant progress! These results exceed initial expectations.",
-            "Multiple factors contribute to successful outcomes. These include planning, execution, and evaluation.",
-            "Consider the following essential elements: analysis, design, implementation, and testing procedures.",
-            "The results proved highly effective! Data analysis confirmed substantial improvements.",
-            "Key components include: strategic planning, resource allocation, and performance monitoring systems.",
-            "This approach demonstrates consistent effectiveness. Furthermore, it provides reliable results!",
-            "Analysis indicates positive trends. However, continued monitoring remains essential.",
-            "The process involves multiple stages: assessment, planning, implementation, and review.",
-            "Significant achievements have been documented! These developments represent major progress."
-        ];
-        
-        let paragraph = '';
-        for (let i = 0; i < 3; i++) {
-            paragraph += sentences[Math.floor(Math.random() * sentences.length)] + ' ';
-        }
-        
-        return paragraph.trim();
-    }
-
-    generateWordRichParagraph() {
-        const words = this.templates.vocabulary;
-        let paragraph = '';
-        
-        for (let i = 0; i < 5; i++) {
-            const word1 = words[Math.floor(Math.random() * words.length)];
-            const word2 = words[Math.floor(Math.random() * words.length)];
-            paragraph += `The ${word1} analysis demonstrates how ${word2} evaluation leads to better outcomes. `;
-        }
-        
-        return paragraph.trim();
-    }
-
-    optimizeForELS(text, message) {
-        // Ensure each character in message appears frequently enough
-        for (let char of message.toLowerCase()) {
-            if (char.match(/[a-z]/)) {
-                const count = (text.toLowerCase().match(new RegExp(char, 'g')) || []).length;
-                if (count < 10) {
-                    text += this.generateCharacterRichSentence(char);
-                }
-            }
-        }
-        return text;
-    }
-
-    generateCharacterRichSentence(char) {
-        const charWords = {
-            'a': ['advanced', 'analysis', 'application', 'approach'],
-            'b': ['beneficial', 'business', 'balanced', 'broad'],
-            'c': ['comprehensive', 'critical', 'complex', 'consistent'],
-            'd': ['detailed', 'development', 'design', 'dynamic'],
-            'e': ['effective', 'evaluation', 'essential', 'evidence'],
-            'f': ['fundamental', 'framework', 'findings', 'factors'],
-            'g': ['general', 'growth', 'guidance', 'global'],
-            'h': ['however', 'highlighted', 'hypothesis', 'historical'],
-            'i': ['important', 'implementation', 'investigation', 'insights'],
-            'j': ['justified', 'joint', 'judgment', 'journey'],
-            'k': ['knowledge', 'key', 'known', 'keeping'],
-            'l': ['logical', 'learning', 'leadership', 'literature'],
-            'm': ['methodology', 'modern', 'management', 'multiple'],
-            'n': ['necessary', 'natural', 'numerous', 'national'],
-            'o': ['outcomes', 'opportunities', 'organizational', 'optimal'],
-            'p': ['process', 'performance', 'planning', 'principles'],
-            'q': ['quality', 'questions', 'quantitative', 'quickly'],
-            'r': ['research', 'results', 'relevant', 'resources'],
-            's': ['systematic', 'significant', 'strategies', 'successful'],
-            't': ['theoretical', 'techniques', 'technology', 'thorough'],
-            'u': ['understanding', 'useful', 'unique', 'universal'],
-            'v': ['valuable', 'various', 'validation', 'vital'],
-            'w': ['work', 'widespread', 'ways', 'within'],
-            'x': ['examined', 'experience', 'extensive', 'expected'],
-            'y': ['years', 'yield', 'yet', 'young'],
-            'z': ['zero', 'zones', 'zeal', 'zenith']
-        };
-        
-        const words = charWords[char] || ['additional', 'analysis'];
-        return ` The ${words[0]} ${words[1]} demonstrates ${words[2] || 'effective'} outcomes. `;
-    }
-
-    countLetters(text) {
-        return (text.match(/[a-zA-Z]/g) || []).length;
-    }
-
-    countWords(text) {
-        return text.trim().split(/\s+/).length;
-    }
-
-    countPunctuation(text) {
-        return (text.match(/[.!]/g) || []).length;
     }
 }
 

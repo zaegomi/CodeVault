@@ -30,82 +30,66 @@
                         <option value="null">Null Cipher</option>
                     </select>
                 </div>
+
+                <!-- NEW: AI Text Generation Controls -->
+                <div class="ai-generation-panel">
+                    <h3>🤖 AI Carrier Text Generation</h3>
+                    <div class="form-group">
+                        <label for="aiTopic">Topic for carrier text:</label>
+                        <input type="text" id="aiTopic" placeholder="e.g., technology, nature, business..." value="technology">
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="aiStyle">Writing style:</label>
+                        <select id="aiStyle">
+                            <option value="casual">Casual</option>
+                            <option value="academic">Academic</option>
+                            <option value="business">Business</option>
+                            <option value="creative">Creative</option>
+                            <option value="news">News</option>
+                        </select>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="aiLength">Text length (words):</label>
+                        <input type="number" id="aiLength" min="50" max="1000" value="200">
+                    </div>
+                    
+                    <button class="ai-generate-btn" id="generateAIText">🚀 Generate AI Carrier Text</button>
+                </div>
             </div>
 
             <div class="panel">
                 <h2>Carrier Text</h2>
-                
-                <!-- Carrier Method Selection -->
                 <div class="form-group">
-                    <label>Choose carrier text method:</label>
-                    <div class="carrier-method-selector">
-                        <label class="radio-option">
-                            <input type="radio" name="carrierMethod" value="manual" id="manualRadio" checked>
-                            <span class="radio-custom"></span>
-                            Manual Input
-                        </label>
-                        <label class="radio-option">
-                            <input type="radio" name="carrierMethod" value="generated" id="generatedRadio">
-                            <span class="radio-custom"></span>
-                            AI Generated
-                        </label>
+                    <label for="carrierText">Enter or paste your carrier text:</label>
+                    <textarea id="carrierText" placeholder="Enter the text that will hide your message..."></textarea>
+                </div>
+                
+                <div class="form-group">
+                    <label>Or upload a text file:</label>
+                    <div class="file-upload">
+                        <input type="file" id="fileUpload" accept=".txt">
+                        <div class="file-upload-btn">📁 Upload Text File</div>
                     </div>
                 </div>
 
-                <!-- Manual Input Section -->
-                <div id="manualCarrierSection">
-                    <div class="form-group">
-                        <label for="carrierText">Enter or paste your carrier text:</label>
-                        <textarea id="carrierText" placeholder="Enter the text that will hide your message..."></textarea>
-                    </div>
-                    
-                    <div class="form-group">
-                        <label>Or upload a text file:</label>
-                        <div class="file-upload">
-                            <input type="file" id="fileUpload" accept=".txt">
-                            <div class="file-upload-btn">📁 Upload Text File</div>
+                <!-- NEW: Text Analysis Display -->
+                <div id="textAnalysis" class="text-analysis hidden">
+                    <h4>📊 Text Analysis</h4>
+                    <div class="analysis-stats">
+                        <div class="analysis-item">
+                            <span class="analysis-label">Word Count:</span>
+                            <span class="analysis-value" id="wordCount">0</span>
                         </div>
-                    </div>
-                </div>
-
-                <!-- AI Generated Section -->
-                <div id="generatedCarrierSection" class="hidden">
-                    <div class="form-group">
-                        <label for="carrierTopic">Topic/Theme for generated text:</label>
-                        <select id="carrierTopic">
-                            <option value="technology">Technology & Innovation</option>
-                            <option value="business">Business & Finance</option>
-                            <option value="science">Science & Research</option>
-                            <option value="education">Education & Learning</option>
-                            <option value="general">General Knowledge</option>
-                        </select>
-                    </div>
-                    
-                    <div class="form-group">
-                        <label for="carrierLength">Desired text length:</label>
-                        <select id="carrierLength">
-                            <option value="short">Short (200-400 words)</option>
-                            <option value="medium" selected>Medium (400-800 words)</option>
-                            <option value="long">Long (800-1200 words)</option>
-                        </select>
-                    </div>
-
-                    <div class="form-group">
-                        <label for="carrierStyle">Writing style:</label>
-                        <select id="carrierStyle">
-                            <option value="formal">Formal/Academic</option>
-                            <option value="casual">Casual/Conversational</option>
-                            <option value="technical">Technical/Professional</option>
-                        </select>
-                    </div>
-
-                    <div class="form-group">
-                        <button type="button" class="generate-btn" id="generateCarrierBtn">🤖 Generate Carrier Text</button>
-                    </div>
-                    
-                    <div class="form-group">
-                        <label for="generatedCarrierText">Generated carrier text:</label>
-                        <textarea id="generatedCarrierText" placeholder="Generated text will appear here..." readonly></textarea>
+                        <div class="analysis-item">
+                            <span class="analysis-label">Character Count:</span>
+                            <span class="analysis-value" id="charCount">0</span>
+                        </div>
+                        <div class="analysis-item">
+                            <span class="analysis-label">Suitability:</span>
+                            <span class="analysis-value" id="suitability">-</span>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -113,6 +97,13 @@
 
         <div class="control-panel">
             <button class="start-btn" id="startBtn">START ENCODING</button>
+        </div>
+
+        <!-- NEW: AI Generation Loading -->
+        <div id="aiLoadingDiv" class="loading hidden">
+            <div class="spinner"></div>
+            <p>AI is generating your carrier text...</p>
+            <small>This may take 10-30 seconds</small>
         </div>
 
         <div id="loadingDiv" class="loading hidden">

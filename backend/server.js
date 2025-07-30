@@ -16,7 +16,7 @@ app.use(helmet());
 app.use(cors({
     origin: process.env.NODE_ENV === 'production' 
         ? ['https://yourdomain.com'] // Replace with your production domain
-        : ['http://localhost:3000', 'http://localhost:5500', 'http://127.0.0.1:5500'],
+        : ['http://localhost:3000', 'http://localhost:5500', 'http://127.0.0.1:5500', 'http://localhost:8000'],
     credentials: true
 }));
 
@@ -41,6 +41,132 @@ const upload = multer({
         }
     }
 });
+
+// OpenAI Integration Class
+class OpenAITextGenerator {
+    constructor() {
+        this.apiKey = process.env.OPENAI_API_KEY;
+        this.baseURL = 'https://api.openai.com/v1/chat/completions';
+    }
+
+    async generateCarrierText(options) {
+        const { message, topic, method, style, length } = options;
+        
+        if (!this.apiKey) {
+            throw new Error('OpenAI API key not configured. Please set OPENAI_API_KEY environment variable.');
+        }
+
+        const prompt = this.buildPrompt(message, topic, method, style, length);
+        
+        try {
+            const response = await fetch(this.baseURL, {
+                method: 'POST',
+                headers: {
+                    'Authorization': `Bearer ${this.apiKey}`,
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    model: 'gpt-4',
+                    messages: [
+                        {
+                            role: 'system',
+                            content: 'You are a professional writer creating carrier text for steganographic purposes. Your text should be natural, engaging, and optimized for the specified encoding method while maintaining authenticity.'
+                        },
+                        {
+                            role: 'user',
+                            content: prompt
+                        }
+                    ],
+                    max_tokens: this.calculateTokens(length),
+                    temperature: 0.7,
+                    top_p: 0.9
+                })
+            });
+
+            if (!response.ok) {
+                const errorData = await response.json().catch(() => ({}));
+                throw new Error(`OpenAI API error: ${response.status} - ${errorData.error?.message || 'Unknown error'}`);
+            }
+
+            const data = await response.json();
+            return {
+                text: data.choices[0]?.message?.content || '',
+                usage: data.usage,
+                model: data.model
+            };
+        } catch (error) {
+            console.error('OpenAI API Error:', error);
+            throw new Error(`Failed to generate text: ${error.message}`);
+        }
+    }
+
+    buildPrompt(message, topic, method, style, length) {
+        const methodInstructions = {
+            'els': `Create text with consistent letter patterns and adequate spacing for Equidistant Letter Sequence encoding. Ensure the text is at least ${message.length * 3} characters long with regular word distribution.`,
+            'acrostic': `Write exactly ${message.length} lines of text where each line can naturally start with any letter. Focus on creating meaningful, flowing content that works well when first letters are modified.`,
+            'punctuation': `Create text with natural punctuation marks (periods and exclamation points) distributed throughout. Include multiple sentences with varied punctuation patterns to accommodate binary encoding.`,
+            'null': `Write text with at least ${message.length} words, ensuring each word can naturally begin with different letters. Focus on creating flowing, natural language that maintains readability when first letters are modified.`
+        };
+
+        const styleInstructions = {
+            'academic': 'Write in formal academic style with sophisticated vocabulary and complex sentence structures.',
+            'casual': 'Use conversational, friendly tone with everyday language and informal expressions.',
+            'business': 'Employ professional business language with clear, direct communication.',
+            'creative': 'Use imaginative, descriptive language with literary elements and creative expression.',
+            'news': 'Write in journalistic style with factual reporting tone and news article structure.'
+        };
+
+        return `Create a ${length}-word text about "${topic}" in ${style} style.
+
+Requirements:
+- ${methodInstructions[method] || 'Create natural, flowing text suitable for steganographic encoding.'}
+- ${styleInstructions[style] || 'Use appropriate writing style.'}
+- Make the content engaging and authentic
+- Ensure the text flows naturally and maintains reader interest
+- Focus on the topic: ${topic}
+
+Do not mention steganography, encoding, or hidden messages. Write only the carrier text content.`;
+    }
+
+    calculateTokens(wordCount) {
+        // Rough estimation: 1 word ≈ 1.3 tokens
+        return Math.min(Math.max(wordCount * 2, 150), 2000);
+    }
+
+    // Fallback text generator when OpenAI is unavailable
+    generateFallbackText(options) {
+        const { message, topic, method, style, length } = options;
+        
+        const templates = {
+            academic: [
+                "Recent studies in the field of {{topic}} have demonstrated significant advancements in our understanding.",
+                "Researchers continue to explore the implications of {{topic}} on modern society.",
+                "The analysis reveals important patterns that contribute to our knowledge base."
+            ],
+            casual: [
+                "Hey there! Let me tell you about {{topic}} and why it's pretty interesting.",
+                "So I was thinking about {{topic}} the other day, and it got me wondering.",
+                "You know what's cool about {{topic}}? There's so much to discover."
+            ],
+            business: [
+                "Our comprehensive analysis of {{topic}} indicates substantial market opportunities.",
+                "The strategic implementation of {{topic}}-related initiatives will drive growth.",
+                "Key performance indicators suggest that {{topic}} remains a priority focus area."
+            ]
+        };
+
+        const selectedTemplates = templates[style] || templates.academic;
+        let text = '';
+        
+        while (text.split(' ').length < length) {
+            const template = selectedTemplates[Math.floor(Math.random() * selectedTemplates.length)];
+            const sentence = template.replace(/\{\{topic\}\}/g, topic);
+            text += sentence + ' ';
+        }
+
+        return text.trim().split(' ').slice(0, length).join(' ') + '.';
+    }
+}
 
 // CodeVault Steganography Engine (Server-side implementation)
 class CodeVaultServer {
@@ -269,13 +395,18 @@ class CodeVaultServer {
     }
 }
 
+// Initialize OpenAI generator
+const aiGenerator = new OpenAITextGenerator();
+
 // API Routes
 app.get('/', (req, res) => {
     res.json({
         message: 'CodeVault Backend Server',
-        version: '1.0.0',
+        version: '2.0.0',
         status: 'Running',
+        features: ['AI Text Generation', 'Steganography Encoding', 'Security Analysis'],
         endpoints: [
+            'POST /api/generate-carrier-text - Generate AI-powered carrier text',
             'POST /api/encode - Encode a message using steganography',
             'POST /api/decode - Decode a hidden message',
             'GET /api/health - Health check'
@@ -287,9 +418,136 @@ app.get('/api/health', (req, res) => {
     res.json({
         status: 'OK',
         timestamp: new Date().toISOString(),
-        uptime: process.uptime()
+        uptime: process.uptime(),
+        openai_configured: !!process.env.OPENAI_API_KEY
     });
 });
+
+// NEW: AI Text Generation Endpoint
+app.post('/api/generate-carrier-text', async (req, res) => {
+    try {
+        const { message, topic, method, style, length } = req.body;
+
+        // Validation
+        if (!message || !topic || !method) {
+            return res.status(400).json({
+                error: 'Missing required fields: message, topic, method'
+            });
+        }
+
+        if (message.length > 500) {
+            return res.status(400).json({
+                error: 'Message too long. Maximum 500 characters allowed.'
+            });
+        }
+
+        const validMethods = ['els', 'acrostic', 'punctuation', 'null'];
+        if (!validMethods.includes(method)) {
+            return res.status(400).json({
+                error: 'Invalid method. Must be one of: ' + validMethods.join(', ')
+            });
+        }
+
+        // Set defaults
+        const options = {
+            message,
+            topic: topic || 'general discussion',
+            method,
+            style: style || 'casual',
+            length: Math.max(length || 200, message.length * 5) // Ensure adequate length
+        };
+
+        let result;
+        try {
+            // Try OpenAI first
+            result = await aiGenerator.generateCarrierText(options);
+            result.source = 'openai';
+        } catch (error) {
+            console.warn('OpenAI generation failed, using fallback:', error.message);
+            // Fall back to template-based generation
+            result = {
+                text: aiGenerator.generateFallbackText(options),
+                source: 'fallback',
+                usage: null,
+                model: 'template-based'
+            };
+        }
+
+        // Validate generated text is suitable for the chosen method
+        const validation = validateTextForMethod(result.text, method, message);
+        
+        res.json({
+            success: true,
+            carrierText: result.text,
+            metadata: {
+                topic: options.topic,
+                method: options.method,
+                style: options.style,
+                requestedLength: options.length,
+                actualWordCount: result.text.split(' ').length,
+                source: result.source,
+                model: result.model,
+                usage: result.usage,
+                validation: validation
+            },
+            timestamp: new Date().toISOString()
+        });
+
+    } catch (error) {
+        console.error('Text generation error:', error);
+        res.status(500).json({
+            error: 'Failed to generate carrier text',
+            details: error.message,
+            timestamp: new Date().toISOString()
+        });
+    }
+});
+
+// Helper function to validate generated text
+function validateTextForMethod(text, method, message) {
+    const validation = {
+        suitable: true,
+        warnings: [],
+        recommendations: []
+    };
+
+    switch (method) {
+        case 'els':
+            const letters = text.replace(/[^a-zA-Z]/g, '').length;
+            const required = message.length * 3;
+            if (letters < required) {
+                validation.suitable = false;
+                validation.warnings.push(`Text has ${letters} letters but needs ${required} for secure ELS encoding`);
+            }
+            break;
+            
+        case 'acrostic':
+            const lines = text.split('\n').length;
+            if (lines < message.length) {
+                validation.warnings.push(`Text has ${lines} lines but needs ${message.length} for acrostic method`);
+                validation.recommendations.push('Consider splitting sentences into separate lines');
+            }
+            break;
+            
+        case 'punctuation':
+            const punctuation = (text.match(/[.!]/g) || []).length;
+            const bitsNeeded = message.length * 8;
+            if (punctuation < bitsNeeded / 2) {
+                validation.warnings.push('Text may need more punctuation marks for binary encoding');
+            }
+            break;
+            
+        case 'null':
+            const words = text.split(/\s+/).length;
+            if (words < message.length) {
+                validation.suitable = false;
+                validation.warnings.push(`Text has ${words} words but needs ${message.length} for null cipher`);
+            }
+            break;
+    }
+
+    return validation;
+}
 
 app.post('/api/encode', (req, res) => {
     try {
@@ -420,6 +678,7 @@ app.use((req, res) => {
         availableEndpoints: [
             'GET /',
             'GET /api/health',
+            'POST /api/generate-carrier-text',
             'POST /api/encode',
             'POST /api/decode',
             'POST /api/upload'
@@ -429,11 +688,13 @@ app.use((req, res) => {
 
 // Start server
 app.listen(PORT, () => {
-    console.log(`CodeVault Backend Server running on http://localhost:${PORT}`);
+    console.log(`CodeVault Backend Server v2.0 running on http://localhost:${PORT}`);
     console.log(`Environment: ${process.env.NODE_ENV || 'development'}`);
+    console.log(`OpenAI API: ${process.env.OPENAI_API_KEY ? '✓ Configured' : '✗ Not configured'}`);
     console.log('Available endpoints:');
     console.log('  GET  / - Server info');
     console.log('  GET  /api/health - Health check');
+    console.log('  POST /api/generate-carrier-text - AI text generation');
     console.log('  POST /api/encode - Encode messages');
     console.log('  POST /api/decode - Decode messages');
     console.log('  POST /api/upload - Upload text files');
