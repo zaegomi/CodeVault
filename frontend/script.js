@@ -21,6 +21,9 @@ class CodeVault {
         // NEW: AI text generation listener
         document.getElementById('generateAIText').addEventListener('click', () => this.generateAICarrierText());
 
+        // NEW: Backend retry listener
+        document.getElementById('retryConnection').addEventListener('click', () => this.checkBackendConnection());
+
         // Real-time validation
         document.getElementById('secretMessage').addEventListener('input', () => this.validateInputs());
         document.getElementById('carrierText').addEventListener('input', () => {
@@ -35,13 +38,20 @@ class CodeVault {
 
     async checkBackendConnection() {
         try {
+            console.log('Checking backend connection...');
             const response = await fetch(`${this.backendUrl}/api/health`);
             const data = await response.json();
             
+            console.log('Backend response:', data);
+            
             if (data.status === 'OK') {
                 this.showBackendStatus('connected', data.openai_configured);
+                console.log('Backend connected successfully');
+            } else {
+                this.showBackendStatus('disconnected');
             }
         } catch (error) {
+            console.error('Backend connection failed:', error);
             this.showBackendStatus('disconnected');
             console.warn('Backend not available, using frontend-only mode');
         }
@@ -49,19 +59,35 @@ class CodeVault {
 
     showBackendStatus(status, aiConfigured = false) {
         const aiBtn = document.getElementById('generateAIText');
+        const statusIndicator = document.getElementById('statusIndicator');
+        const statusText = document.getElementById('statusText');
+        const retryBtn = document.getElementById('retryConnection');
+        
+        console.log('Setting backend status:', status, 'AI configured:', aiConfigured);
+        
         if (status === 'connected') {
             aiBtn.disabled = false;
+            statusIndicator.textContent = '✅';
+            retryBtn.style.display = 'none';
+            
             if (aiConfigured) {
                 aiBtn.innerHTML = '🚀 Generate AI Carrier Text';
-                aiBtn.title = 'AI text generation available';
+                aiBtn.title = 'AI text generation available with OpenAI';
+                statusText.textContent = 'Backend connected - OpenAI ready';
             } else {
                 aiBtn.innerHTML = '🤖 Generate Template Text';
-                aiBtn.title = 'Backend available but OpenAI not configured - using fallback generation';
+                aiBtn.title = 'Backend available - using template generation (OpenAI not configured)';
+                statusText.textContent = 'Backend connected - Template mode';
             }
+            console.log('Backend status: Connected');
         } else {
             aiBtn.disabled = true;
             aiBtn.innerHTML = '⚠️ Backend Required';
             aiBtn.title = 'Backend server not available';
+            statusIndicator.textContent = '❌';
+            statusText.textContent = 'Backend disconnected';
+            retryBtn.style.display = 'inline-block';
+            console.log('Backend status: Disconnected');
         }
     }
 
@@ -283,37 +309,37 @@ class CodeVault {
         document.getElementById('resultsDiv').classList.add('hidden');
         document.getElementById('startBtn').disabled = true;
 
-        // Try backend first, fallback to frontend
         try {
-            const response = await fetch(`${this.backendUrl}/api/encode`, {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                },
-                body: JSON.stringify({
-                    message: secretMessage,
-                    carrierText: carrierText,
-                    method: method
-                })
-            });
+            // Try backend first, fallback to frontend
+            try {
+                const response = await fetch(`${this.backendUrl}/api/encode`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        message: secretMessage,
+                        carrierText: carrierText,
+                        method: method
+                    })
+                });
 
-            if (response.ok) {
-                const data = await response.json();
-                this.currentResult = data.result.encodedText;
-                this.currentMethod = method;
-                this.decodingInstructions = data.result.instructions;
-                this.displayResults(data.result);
-                this.showSuccess('Message encoded successfully using backend!');
-                return;
+                if (response.ok) {
+                    const data = await response.json();
+                    this.currentResult = data.result.encodedText;
+                    this.currentMethod = method;
+                    this.decodingInstructions = data.result.instructions;
+                    this.displayResults(data.result);
+                    this.showSuccess('Message encoded successfully using backend!');
+                    return;
+                }
+            } catch (error) {
+                console.warn('Backend encoding failed, using frontend fallback:', error);
             }
-        } catch (error) {
-            console.warn('Backend encoding failed, using frontend fallback:', error);
-        }
 
-        // Fallback to frontend encoding
-        await new Promise(resolve => setTimeout(resolve, 1000));
+            // Fallback to frontend encoding
+            await new Promise(resolve => setTimeout(resolve, 1000));
 
-        try {
             let result;
             switch (method) {
                 case 'els':
@@ -341,6 +367,7 @@ class CodeVault {
         } catch (error) {
             this.showError(error.message);
         } finally {
+            // ALWAYS hide loading and re-enable button, regardless of success or failure
             document.getElementById('loadingDiv').classList.add('hidden');
             document.getElementById('startBtn').disabled = false;
         }
