@@ -106,31 +106,60 @@ class OpenAITextGenerator {
     }
 
     buildPrompt(message, topic, method, style, length) {
-        const methodInstructions = {
-            'els': `Create text with consistent letter patterns and adequate spacing for Equidistant Letter Sequence encoding. Ensure the text is at least ${message.length * 3} characters long with regular word distribution.`,
-            'acrostic': `Write exactly ${message.length} lines of text where each line can naturally start with any letter. Focus on creating meaningful, flowing content that works well when first letters are modified.`,
-            'punctuation': `Create text with natural punctuation marks (periods and exclamation points) distributed throughout. Include multiple sentences with varied punctuation patterns to accommodate binary encoding.`,
-            'null': `Write text with at least ${message.length} words, ensuring each word can naturally begin with different letters. Focus on creating flowing, natural language that maintains readability when first letters are modified.`
-        };
+        const cleanMessage = message.toLowerCase().replace(/[^a-z]/g, '');
+        
+        let methodPrompt = '';
+        
+        switch (method) {
+            case 'els':
+                // For ELS, we need the letters to appear naturally at intervals
+                const letterString = cleanMessage.split('').join(', ');
+                methodPrompt = `Write naturally flowing text about "${topic}" that organically contains these letters distributed throughout: ${letterString}. The text should be approximately ${length} words and feel completely natural. Don't force these letters - let them appear as part of normal vocabulary and natural word choices. Focus on quality content about ${topic} while ensuring good letter distribution throughout the text.`;
+                break;
+                
+            case 'acrostic':
+                // For acrostic, generate text that naturally starts lines with target letters
+                const targetLetters = cleanMessage.split('');
+                methodPrompt = `Write a ${cleanMessage.length}-paragraph text about "${topic}" where each paragraph naturally begins with words starting with these letters in order: ${targetLetters.join(', ').toUpperCase()}. Each paragraph should be substantial (3-4 sentences) and flow naturally into the next. The content should focus entirely on ${topic} and read as a cohesive piece. Make the letter choices feel completely natural - choose words that would normally start paragraphs about this topic.`;
+                break;
+                
+            case 'punctuation':
+                // For punctuation, we need strategic but natural punctuation use
+                const sentenceCount = Math.max(8, Math.floor(message.length / 2));
+                methodPrompt = `Write engaging text about "${topic}" using exactly ${sentenceCount} sentences with varied lengths and natural punctuation. Use a mix of declarative sentences (ending with periods) and exciting/emphatic statements (ending with exclamation marks). The punctuation should feel completely natural to the content - use exclamation marks for emphasis, excitement, or strong statements, and periods for regular statements. Focus on creating compelling content about ${topic}.`;
+                break;
+                
+            case 'null':
+                // For null cipher, we need exactly the right number of meaningful words
+                const wordCount = cleanMessage.length;
+                methodPrompt = `Write exactly ${wordCount} words about "${topic}". Each word should be meaningful and substantial (avoid articles like 'a', 'an', 'the' and short prepositions). Create a flowing, descriptive piece where every word counts and contributes to painting a vivid picture of ${topic}. Use strong nouns, vivid adjectives, and powerful verbs. The text should read as polished, professional content despite the word limit.`;
+                break;
+        }
 
         const styleInstructions = {
-            'academic': 'Write in formal academic style with sophisticated vocabulary and complex sentence structures.',
-            'casual': 'Use conversational, friendly tone with everyday language and informal expressions.',
-            'business': 'Employ professional business language with clear, direct communication.',
-            'creative': 'Use imaginative, descriptive language with literary elements and creative expression.',
-            'news': 'Write in journalistic style with factual reporting tone and news article structure.'
+            'academic': 'Use formal academic tone with sophisticated vocabulary, complex sentence structures, and scholarly language.',
+            'casual': 'Write in a conversational, friendly tone with everyday language and natural expressions.',
+            'business': 'Employ professional business language with clear, direct communication and industry-appropriate terminology.',
+            'creative': 'Use imaginative, descriptive language with literary elements, metaphors, and creative expression.',
+            'news': 'Write in journalistic style with factual reporting tone, clear structure, and informative content.'
         };
 
-        return `Create a ${length}-word text about "${topic}" in ${style} style.
+        return `Create compelling content about "${topic}" in ${style} style.
 
-Requirements:
-- ${methodInstructions[method] || 'Create natural, flowing text suitable for steganographic encoding.'}
-- ${styleInstructions[style] || 'Use appropriate writing style.'}
-- Make the content engaging and authentic
-- Ensure the text flows naturally and maintains reader interest
-- Focus on the topic: ${topic}
+CONTENT REQUIREMENTS:
+${methodPrompt}
 
-Do not mention steganography, encoding, or hidden messages. Write only the carrier text content.`;
+STYLE REQUIREMENTS:
+${styleInstructions[style] || 'Use appropriate professional writing style.'}
+
+QUALITY STANDARDS:
+- Make the content genuinely engaging and informative about ${topic}
+- Ensure natural flow and readability
+- Use varied vocabulary and sentence structures
+- The text should feel authentic and professionally written
+- Focus on delivering real value to readers interested in ${topic}
+
+Write only the content - no meta-commentary about the writing process.`;
     }
 
     calculateTokens(wordCount) {
@@ -403,6 +432,91 @@ class CodeVaultServer {
 // Initialize OpenAI generator
 const aiGenerator = new OpenAITextGenerator();
 
+// Text optimization function (define before using it)
+function optimizeTextForMethod(text, method, message) {
+    const cleanMessage = message.toLowerCase().replace(/[^a-z]/g, '');
+    
+    switch (method) {
+        case 'acrostic':
+            // Split into paragraphs and ensure we have enough
+            let paragraphs = text.split('\n\n').filter(p => p.trim().length > 0);
+            
+            // If we have paragraph breaks, use those; otherwise try sentence breaks
+            if (paragraphs.length < cleanMessage.length) {
+                paragraphs = text.split(/\.(?:\s+[A-Z])/);
+                if (paragraphs.length > 1) {
+                    // Reconstruct sentences properly
+                    for (let i = 0; i < paragraphs.length - 1; i++) {
+                        paragraphs[i] += '.';
+                    }
+                }
+            }
+            
+            // Ensure we have enough content blocks
+            while (paragraphs.length < cleanMessage.length) {
+                const contextualSentences = [
+                    'Additionally, this perspective offers valuable insights into the subject matter.',
+                    'Furthermore, experts continue to explore new dimensions of this field.',
+                    'Moreover, recent developments have enhanced our understanding significantly.',
+                    'Therefore, continued research remains essential for progress.',
+                    'Consequently, these findings contribute to broader knowledge.',
+                    'Subsequently, new opportunities emerge for further investigation.',
+                    'Nevertheless, challenges persist that require innovative solutions.',
+                    'Ultimately, these advances benefit society in meaningful ways.',
+                    'Indeed, the implications extend far beyond initial expectations.',
+                    'Obviously, such developments warrant careful consideration and study.'
+                ];
+                
+                const randomSentence = contextualSentences[paragraphs.length % contextualSentences.length];
+                paragraphs.push(randomSentence);
+            }
+            
+            return paragraphs.slice(0, cleanMessage.length).join('\n\n');
+            
+        case 'null':
+            // For null cipher, ensure exactly the right number of quality words
+            const words = text.split(/\s+/).filter(word => word.length > 0);
+            const neededWords = cleanMessage.length;
+            
+            if (words.length < neededWords) {
+                // Add sophisticated filler words that fit the context
+                const contextualWords = [
+                    'innovation', 'development', 'advancement', 'progress', 'achievement',
+                    'excellence', 'quality', 'effectiveness', 'efficiency', 'optimization',
+                    'enhancement', 'improvement', 'refinement', 'sophistication', 'integration',
+                    'collaboration', 'partnership', 'synergy', 'methodology', 'framework'
+                ];
+                
+                while (words.length < neededWords) {
+                    words.push(contextualWords[words.length % contextualWords.length]);
+                }
+            }
+            
+            // Ensure we have exactly the needed number of words
+            const finalWords = words.slice(0, neededWords);
+            return finalWords.join(' ') + '.';
+            
+        case 'punctuation':
+            // For punctuation method, ensure natural but adequate punctuation
+            let modifiedText = text;
+            
+            // Count existing punctuation
+            const existingPunct = (modifiedText.match(/[.!]/g) || []).length;
+            const needed = Math.max(message.length * 8, 32); // Minimum reasonable amount
+            
+            if (existingPunct < needed) {
+                // Add some natural exclamation points for emphasis
+                modifiedText = modifiedText.replace(/\. (This|These|It|They|Such|What|How)/g, '! $1');
+                modifiedText = modifiedText.replace(/\. (Clearly|Obviously|Certainly|Indeed|Absolutely)/g, '! $1');
+            }
+            
+            return modifiedText;
+            
+        default:
+            return text;
+    }
+}
+
 // API Routes
 app.get('/', (req, res) => {
     res.json({
@@ -467,6 +581,10 @@ app.post('/api/generate-carrier-text', async (req, res) => {
             // Try OpenAI first
             result = await aiGenerator.generateCarrierText(options);
             result.source = 'openai';
+            
+            // Post-process the AI generated text for better encoding compatibility
+            result.text = optimizeTextForMethod(result.text, options.method, options.message);
+            
         } catch (error) {
             console.warn('OpenAI generation failed, using fallback:', error.message);
             // Fall back to template-based generation
@@ -508,49 +626,149 @@ app.post('/api/generate-carrier-text', async (req, res) => {
     }
 });
 
+// Text optimization function
+app.optimizeTextForMethod = function(text, method, message) {
+    const cleanMessage = message.toLowerCase().replace(/[^a-z]/g, '');
+    
+    switch (method) {
+        case 'acrostic':
+            // Ensure we have enough lines and they start with letters
+            const lines = text.split('\n').filter(line => line.trim().length > 0);
+            const neededLines = cleanMessage.length;
+            
+            if (lines.length < neededLines) {
+                // Add additional lines
+                const additionalLines = [
+                    'Furthermore, this analysis reveals important insights.',
+                    'Additionally, we can observe significant patterns.',
+                    'Moreover, these findings suggest compelling conclusions.',
+                    'Therefore, the evidence supports our understanding.',
+                    'Consequently, we gain valuable perspective.',
+                    'Subsequently, the implications become clear.',
+                    'Nevertheless, further investigation remains valuable.',
+                    'Ultimately, these discoveries enhance our knowledge.'
+                ];
+                
+                while (lines.length < neededLines) {
+                    lines.push(additionalLines[lines.length % additionalLines.length]);
+                }
+            }
+            
+            return lines.slice(0, neededLines).join('\n');
+            
+        case 'null':
+            // Ensure we have enough words
+            const words = text.split(/\s+/).filter(word => word.length > 0);
+            const neededWords = cleanMessage.length;
+            
+            if (words.length < neededWords) {
+                // Add quality filler words
+                const fillerWords = [
+                    'additionally', 'furthermore', 'moreover', 'therefore', 'consequently',
+                    'subsequently', 'nevertheless', 'however', 'meanwhile', 'ultimately',
+                    'specifically', 'particularly', 'especially', 'notably', 'significantly'
+                ];
+                
+                while (words.length < neededWords) {
+                    words.push(fillerWords[words.length % fillerWords.length]);
+                }
+            }
+            
+            return words.slice(0, neededWords).join(' ');
+            
+        default:
+            return text;
+    }
+};
+
 // Helper function to validate generated text
 function validateTextForMethod(text, method, message) {
     const validation = {
         suitable: true,
         warnings: [],
-        recommendations: []
+        recommendations: [],
+        score: 0
     };
+
+    const cleanMessage = message.toLowerCase().replace(/[^a-z]/g, '');
 
     switch (method) {
         case 'els':
             const letters = text.replace(/[^a-zA-Z]/g, '').length;
-            const required = message.length * 3;
+            const required = cleanMessage.length * 5; // More conservative requirement
             if (letters < required) {
                 validation.suitable = false;
                 validation.warnings.push(`Text has ${letters} letters but needs ${required} for secure ELS encoding`);
+                validation.score = Math.max(0, (letters / required) * 100);
+            } else {
+                validation.score = Math.min(100, (letters / required) * 100);
+                if (letters > required * 2) {
+                    validation.score = 95; // Very good
+                    validation.recommendations.push('Excellent letter density for ELS encoding');
+                }
             }
             break;
             
         case 'acrostic':
-            const lines = text.split('\n').length;
-            if (lines < message.length) {
-                validation.warnings.push(`Text has ${lines} lines but needs ${message.length} for acrostic method`);
-                validation.recommendations.push('Consider splitting sentences into separate lines');
+            const lines = text.split('\n').filter(line => line.trim().length > 0);
+            if (lines.length < cleanMessage.length) {
+                validation.suitable = false;
+                validation.warnings.push(`Text has ${lines.length} lines but needs ${cleanMessage.length} for acrostic method`);
+                validation.score = (lines.length / cleanMessage.length) * 100;
+            } else {
+                validation.score = 100;
+                // Check if first letters can be easily modified
+                let modifiableLines = 0;
+                for (let i = 0; i < Math.min(lines.length, cleanMessage.length); i++) {
+                    const firstLetter = lines[i].match(/[a-zA-Z]/);
+                    if (firstLetter) modifiableLines++;
+                }
+                validation.score = (modifiableLines / cleanMessage.length) * 100;
+                if (validation.score === 100) {
+                    validation.recommendations.push('Perfect acrostic structure');
+                }
             }
             break;
             
         case 'punctuation':
             const punctuation = (text.match(/[.!]/g) || []).length;
-            const bitsNeeded = message.length * 8;
+            const bitsNeeded = cleanMessage.length * 8;
             if (punctuation < bitsNeeded / 2) {
-                validation.warnings.push('Text may need more punctuation marks for binary encoding');
+                validation.warnings.push(`Text has ${punctuation} punctuation marks but may need up to ${bitsNeeded} for binary encoding`);
+                validation.score = (punctuation / (bitsNeeded / 2)) * 100;
+            } else {
+                validation.score = Math.min(100, (punctuation / bitsNeeded) * 100);
+                if (punctuation >= bitsNeeded) {
+                    validation.recommendations.push('Excellent punctuation density for binary encoding');
+                }
             }
             break;
             
         case 'null':
-            const words = text.split(/\s+/).length;
-            if (words < message.length) {
+            const words = text.split(/\s+/).filter(word => word.length > 0);
+            if (words.length < cleanMessage.length) {
                 validation.suitable = false;
-                validation.warnings.push(`Text has ${words} words but needs ${message.length} for null cipher`);
+                validation.warnings.push(`Text has ${words.length} words but needs ${cleanMessage.length} for null cipher`);
+                validation.score = (words.length / cleanMessage.length) * 100;
+            } else {
+                validation.score = 100;
+                // Check word quality
+                let qualityWords = 0;
+                for (let i = 0; i < Math.min(words.length, cleanMessage.length); i++) {
+                    const word = words[i];
+                    if (word.length > 2 && word.match(/[a-zA-Z]/)) {
+                        qualityWords++;
+                    }
+                }
+                validation.score = (qualityWords / cleanMessage.length) * 100;
+                if (validation.score > 90) {
+                    validation.recommendations.push('High-quality words suitable for null cipher');
+                }
             }
             break;
     }
 
+    validation.score = Math.round(validation.score);
     return validation;
 }
 
