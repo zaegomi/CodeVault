@@ -258,19 +258,33 @@ class CodeVaultPro {
         }
     }
 
-    // DECODING METHODS
+    // DECODING METHODS - Fixed to match encoding algorithms exactly
     decodeELS(text) {
-        // Try different skip distances to find the most likely message
+        // Use the same algorithm as testDecodeELS but try different skip distances
         const cleanText = text.replace(/[^a-zA-Z]/g, '');
         let bestResult = { message: '', confidence: 0 };
 
-        // Try skip distances from 2 to text length / 10
-        for (let skip = 2; skip <= Math.min(50, Math.floor(cleanText.length / 5)); skip++) {
+        // Try skip distances from 2 to reasonable maximum
+        for (let skip = 2; skip <= Math.min(50, Math.floor(cleanText.length / 3)); skip++) {
             let message = '';
-            for (let i = 0; i < cleanText.length; i += skip) {
-                if (i < cleanText.length) {
-                    message += cleanText[i].toLowerCase();
+            let currentPos = 0;
+            
+            // Use the same extraction method as the encoding
+            for (let i = 0; i < Math.floor(cleanText.length / skip); i++) {
+                let placed = false;
+                
+                for (let j = 0; j < skip && !placed; j++) {
+                    const pos = currentPos + j;
+                    if (pos < text.length) {
+                        const char = text[pos];
+                        if (char.match(/[a-zA-Z]/)) {
+                            message += char.toLowerCase();
+                            placed = true;
+                        }
+                    }
                 }
+                
+                currentPos += skip;
                 if (message.length > 100) break; // Prevent extremely long messages
             }
             
@@ -318,13 +332,23 @@ class CodeVaultPro {
     }
 
     decodeAcrostic(text) {
-        const lines = text.split('\n').filter(line => line.trim().length > 0);
+        // Use the exact same algorithm as testDecodeAcrostic
+        const lines = text.split('\n');
         let message = '';
 
-        for (let line of lines) {
-            const firstLetter = line.match(/[a-zA-Z]/);
-            if (firstLetter) {
-                message += firstLetter[0].toLowerCase();
+        for (let i = 0; i < lines.length; i++) {
+            const line = lines[i];
+            let firstLetterIndex = -1;
+            for (let j = 0; j < line.length; j++) {
+                if (line[j].match(/[a-zA-Z]/)) {
+                    firstLetterIndex = j;
+                    break;
+                }
+            }
+            
+            if (firstLetterIndex !== -1) {
+                const char = line[firstLetterIndex];
+                message += char.toLowerCase();
             }
         }
 
@@ -332,47 +356,53 @@ class CodeVaultPro {
     }
 
     decodePunctuation(text) {
+        // Use the exact same algorithm as testDecodePunctuation
         let binaryString = '';
         
-        // Extract all punctuation marks in order
-        for (let char of text) {
+        for (let i = 0; i < text.length; i++) {
+            const char = text[i];
             if (char === '.') {
                 binaryString += '0';
             } else if (char === '!') {
                 binaryString += '1';
             }
         }
-
-        // Convert binary to text
+        
         let message = '';
         for (let i = 0; i < binaryString.length; i += 8) {
             const byte = binaryString.slice(i, i + 8);
             if (byte.length === 8) {
                 const charCode = parseInt(byte, 2);
-                if (charCode > 0 && charCode < 128) { // Valid ASCII
+                if (charCode > 0 && charCode < 128) {
                     const char = String.fromCharCode(charCode);
-                    if (char.match(/[a-zA-Z0-9\s.,!?'"]/)) { // Only printable characters
-                        message += char;
-                    } else {
-                        break; // Stop if we hit non-printable characters
-                    }
+                    message += char;
                 } else {
                     break;
                 }
             }
         }
-
-        return message.trim();
+        
+        return message;
     }
 
     decodeNullCipher(text) {
+        // Use the exact same algorithm as testDecodeNullCipher
         const words = text.split(/\s+/).filter(word => word.length > 0);
         let message = '';
 
-        for (let word of words) {
-            const firstLetter = word.match(/[a-zA-Z]/);
-            if (firstLetter) {
-                message += firstLetter[0].toLowerCase();
+        for (let i = 0; i < words.length; i++) {
+            const word = words[i];
+            let firstLetterIndex = -1;
+            for (let j = 0; j < word.length; j++) {
+                if (word[j].match(/[a-zA-Z]/)) {
+                    firstLetterIndex = j;
+                    break;
+                }
+            }
+            
+            if (firstLetterIndex !== -1) {
+                const char = word[firstLetterIndex];
+                message += char.toLowerCase();
             }
         }
 
