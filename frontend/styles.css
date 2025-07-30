@@ -1,4 +1,4 @@
-/* Professional blue/grey gradient theme */
+/* Professional blue/grey gradient theme with enhanced decoding styles */
 * {
     margin: 0;
     padding: 0;
@@ -35,6 +35,45 @@ body {
     color: #f0f0f0;
     font-size: 1.2rem;
     margin-bottom: 20px;
+}
+
+/* Navigation Tabs */
+.nav-tabs {
+    display: flex;
+    justify-content: center;
+    margin-bottom: 30px;
+    gap: 5px;
+}
+
+.nav-tab {
+    background: rgba(255, 255, 255, 0.1);
+    color: #fff;
+    border: none;
+    padding: 15px 30px;
+    font-size: 1.1rem;
+    font-weight: 600;
+    border-radius: 8px 8px 0 0;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    border-bottom: 3px solid transparent;
+}
+
+.nav-tab:hover {
+    background: rgba(255, 255, 255, 0.2);
+}
+
+.nav-tab.active {
+    background: rgba(255, 255, 255, 0.95);
+    color: #4a5568;
+    border-bottom: 3px solid #4299e1;
+}
+
+.tab-content {
+    display: none;
+}
+
+.tab-content.active {
+    display: block;
 }
 
 .main-content {
@@ -103,7 +142,7 @@ textarea {
     font-family: 'Courier New', monospace;
 }
 
-/* NEW: AI Generation Panel Styling */
+/* AI Generation Panel Styling */
 .ai-generation-panel {
     background: linear-gradient(145deg, #f8fafc, #edf2f7);
     border: 2px solid #4299e1;
@@ -180,7 +219,6 @@ textarea {
     background: #cbd5e0;
 }
 
-
 .ai-generate-btn:hover {
     background: linear-gradient(45deg, #3182ce, #2c5282);
     transform: translateY(-2px);
@@ -210,7 +248,7 @@ textarea {
     100% { left: 100%; }
 }
 
-/* NEW: Text Analysis Styling */
+/* Text Analysis Styling */
 .text-analysis {
     background: linear-gradient(145deg, #fff5f5, #fed7d7);
     border: 1px solid #feb2b2;
@@ -243,6 +281,39 @@ textarea {
 .analysis-value {
     font-weight: 700;
     color: #2d3748;
+}
+
+.analysis-value.good { color: #38a169; }
+.analysis-value.fair { color: #d69e2e; }
+.analysis-value.poor { color: #e53e3e; }
+
+/* Decoding specific styles */
+.decode-panel {
+    background: linear-gradient(145deg, #fef5e7, #fbd38d);
+    border: 2px solid #f6ad55;
+}
+
+.decode-panel h2 {
+    color: #c05621;
+}
+
+.method-detection {
+    background: linear-gradient(145deg, #e6fffa, #b2f5ea);
+    border: 1px solid #4fd1c7;
+    border-radius: 6px;
+    padding: 15px;
+    margin-top: 15px;
+}
+
+.method-detection h4 {
+    color: #285e61;
+    margin-bottom: 10px;
+}
+
+.detected-method {
+    font-weight: 700;
+    color: #2c7a7b;
+    font-size: 1.1rem;
 }
 
 .file-upload {
@@ -282,7 +353,7 @@ textarea {
     margin: 30px 0;
 }
 
-.start-btn {
+.start-btn, .decode-btn {
     background: linear-gradient(45deg, #38b2ac, #319795);
     color: white;
     border: none;
@@ -297,13 +368,24 @@ textarea {
     box-shadow: 0 4px 15px rgba(56, 178, 172, 0.4);
 }
 
+.decode-btn {
+    background: linear-gradient(45deg, #e53e3e, #c53030);
+    box-shadow: 0 4px 15px rgba(229, 62, 62, 0.4);
+}
+
 .start-btn:hover {
     background: linear-gradient(45deg, #319795, #2c7a7b);
     transform: translateY(-3px);
     box-shadow: 0 6px 20px rgba(56, 178, 172, 0.5);
 }
 
-.start-btn:disabled {
+.decode-btn:hover {
+    background: linear-gradient(45deg, #c53030, #9c2626);
+    transform: translateY(-3px);
+    box-shadow: 0 6px 20px rgba(229, 62, 62, 0.5);
+}
+
+.start-btn:disabled, .decode-btn:disabled {
     background: #a0aec0;
     cursor: not-allowed;
     transform: none;
@@ -336,6 +418,31 @@ textarea {
     white-space: pre-wrap;
     max-height: 300px;
     overflow-y: auto;
+}
+
+.decoded-message {
+    background: #c6f6d5;
+    border: 2px solid #38a169;
+    border-radius: 8px;
+    padding: 20px;
+    margin-bottom: 20px;
+    text-align: center;
+}
+
+.decoded-message h3 {
+    color: #22543d;
+    margin-bottom: 10px;
+}
+
+.decoded-message .message {
+    font-size: 1.4rem;
+    font-weight: 700;
+    color: #1a365d;
+    font-family: 'Courier New', monospace;
+    background: #fff;
+    padding: 15px;
+    border-radius: 6px;
+    border: 1px solid #22543d;
 }
 
 .stats {
@@ -476,6 +583,17 @@ textarea {
     
     .header h1 {
         font-size: 2.5rem;
+    }
+    
+    .nav-tabs {
+        flex-direction: column;
+        align-items: center;
+    }
+    
+    .nav-tab {
+        width: 200px;
+        border-radius: 6px;
+        margin-bottom: 5px;
     }
     
     .action-buttons {

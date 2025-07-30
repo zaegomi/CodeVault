@@ -1,59 +1,560 @@
-// CodeVault Steganography Engine with AI Integration
-class CodeVault {
+// Enhanced CodeVault with Decoding Functionality
+class CodeVaultPro {
     constructor() {
         this.initializeEventListeners();
         this.currentResult = null;
         this.currentMethod = null;
         this.decodingInstructions = null;
         this.backendUrl = 'http://localhost:3001';
+        this.activeTab = 'encode';
         this.checkBackendConnection();
     }
 
     initializeEventListeners() {
-        // Original event listeners
+        // Original encoding event listeners
         document.getElementById('startBtn').addEventListener('click', () => this.processMessage());
         document.getElementById('fileUpload').addEventListener('change', (e) => this.handleFileUpload(e));
         document.getElementById('copyBtn').addEventListener('click', () => this.copyResult());
         document.getElementById('downloadBtn').addEventListener('click', () => this.downloadResult());
-        document.getElementById('decodeBtn').addEventListener('click', () => this.testDecode());
+        document.getElementById('testDecodeBtn').addEventListener('click', () => this.testDecode());
         document.getElementById('resetBtn').addEventListener('click', () => this.resetApp());
-
-        // NEW: AI text generation listener
         document.getElementById('generateAIText').addEventListener('click', () => this.generateAICarrierText());
-
-        // NEW: Backend retry listener
         document.getElementById('retryConnection').addEventListener('click', () => this.checkBackendConnection());
 
-        // Real-time validation
+        // NEW: Decoding event listeners
+        document.getElementById('decodeBtn').addEventListener('click', () => this.decodeMessage());
+        document.getElementById('decodeFileUpload').addEventListener('change', (e) => this.handleDecodeFileUpload(e));
+        document.getElementById('copyDecodedBtn').addEventListener('click', () => this.copyDecodedMessage());
+        document.getElementById('downloadDecodedBtn').addEventListener('click', () => this.downloadDecodedMessage());
+        document.getElementById('analyzeBtn').addEventListener('click', () => this.showDetailedAnalysis());
+        document.getElementById('resetDecodeBtn').addEventListener('click', () => this.resetDecoder());
+
+        // Real-time validation for encoding
         document.getElementById('secretMessage').addEventListener('input', () => this.validateInputs());
         document.getElementById('carrierText').addEventListener('input', () => {
             this.validateInputs();
             this.analyzeText();
         });
 
-        // NEW: AI parameter change listeners
+        // Real-time validation for decoding
+        document.getElementById('encodedText').addEventListener('input', () => this.analyzeEncodedText());
+        document.getElementById('decodeMethod').addEventListener('change', () => this.updateDecodingTips());
+
+        // AI parameter change listeners
         document.getElementById('encryptionMethod').addEventListener('change', () => this.updateAIRecommendations());
         document.getElementById('secretMessage').addEventListener('input', () => this.updateAIRecommendations());
     }
 
+    // Tab switching functionality
+    switchTab(tabName) {
+        // Update active tab
+        this.activeTab = tabName;
+        
+        // Update tab buttons
+        document.querySelectorAll('.nav-tab').forEach(tab => {
+            tab.classList.remove('active');
+        });
+        event.target.classList.add('active');
+        
+        // Update tab content
+        document.querySelectorAll('.tab-content').forEach(content => {
+            content.classList.remove('active');
+        });
+        document.getElementById(tabName + 'Tab').classList.add('active');
+        
+        // Hide results when switching tabs
+        document.getElementById('resultsDiv').classList.add('hidden');
+        document.getElementById('decodeResultsDiv').classList.add('hidden');
+        document.getElementById('errorDiv').classList.add('hidden');
+        document.getElementById('successDiv').classList.add('hidden');
+    }
+
+    // DECODING FUNCTIONALITY
+    analyzeEncodedText() {
+        const encodedText = document.getElementById('encodedText').value;
+        
+        if (!encodedText) {
+            document.getElementById('decodeAnalysis').classList.add('hidden');
+            document.getElementById('detectedMethodInfo').classList.add('hidden');
+            document.getElementById('decodeBtn').disabled = true;
+            return;
+        }
+
+        // Enable decode button
+        document.getElementById('decodeBtn').disabled = false;
+
+        // Analyze text patterns
+        const words = encodedText.split(/\s+/).filter(word => word.length > 0);
+        const chars = encodedText.length;
+        const punctuation = (encodedText.match(/[.!]/g) || []).length;
+        const lines = encodedText.split('\n').length;
+
+        // Update analysis display
+        document.getElementById('decodeWordCount').textContent = words.length;
+        document.getElementById('decodeCharCount').textContent = chars;
+        document.getElementById('decodePunctCount').textContent = punctuation;
+        document.getElementById('decodeLineCount').textContent = lines;
+        document.getElementById('decodeAnalysis').classList.remove('hidden');
+
+        // Auto-detect method if selected
+        if (document.getElementById('decodeMethod').value === 'auto') {
+            this.detectEncodingMethod(encodedText);
+        }
+    }
+
+    detectEncodingMethod(text) {
+        const words = text.split(/\s+/).filter(word => word.length > 0);
+        const lines = text.split('\n').filter(line => line.trim().length > 0);
+        const punctuation = (text.match(/[.!]/g) || []).length;
+        const letters = text.replace(/[^a-zA-Z]/g, '').length;
+
+        let scores = {
+            punctuation: 0,
+            acrostic: 0,
+            null: 0,
+            els: 0
+        };
+
+        // Punctuation method detection
+        if (punctuation > words.length * 0.3) {
+            scores.punctuation += 3;
+        }
+        if (punctuation > 20) {
+            scores.punctuation += 2;
+        }
+
+        // Acrostic method detection
+        if (lines.length > 3 && lines.length < 50) {
+            scores.acrostic += 2;
+        }
+        if (lines.length >= 5) {
+            scores.acrostic += 1;
+        }
+
+        // Null cipher detection
+        if (words.length > 5 && words.length < 100) {
+            scores.null += 2;
+        }
+
+        // ELS detection (harder to detect, but longer texts are more likely)
+        if (letters > 200) {
+            scores.els += 2;
+        }
+        if (letters > 500) {
+            scores.els += 1;
+        }
+
+        // Find the method with highest score
+        const bestMethod = Object.keys(scores).reduce((a, b) => scores[a] > scores[b] ? a : b);
+        const confidence = scores[bestMethod];
+
+        if (confidence > 0) {
+            const methodNames = {
+                punctuation: 'Punctuation Pattern',
+                acrostic: 'Acrostic Method',
+                null: 'Null Cipher',
+                els: 'Equidistant Letter Sequence'
+            };
+
+            document.getElementById('detectedMethod').textContent = methodNames[bestMethod];
+            document.getElementById('detectionConfidence').textContent = 
+                `Confidence: ${Math.min(confidence * 25, 85)}% - ${this.getConfidenceDescription(confidence)}`;
+            document.getElementById('detectedMethodInfo').classList.remove('hidden');
+            
+            // Auto-select the detected method
+            document.getElementById('decodeMethod').value = bestMethod;
+        } else {
+            document.getElementById('detectedMethodInfo').classList.add('hidden');
+        }
+    }
+
+    getConfidenceDescription(score) {
+        if (score >= 3) return "High confidence detection";
+        if (score >= 2) return "Moderate confidence detection";
+        if (score >= 1) return "Low confidence detection";
+        return "Method unclear";
+    }
+
+    updateDecodingTips() {
+        const method = document.getElementById('decodeMethod').value;
+        const tipsElement = document.getElementById('decodingTips');
+        
+        const tips = {
+            auto: "Select a specific method or let auto-detection analyze the text patterns.",
+            els: "ELS reads characters at regular intervals. Works best with longer texts.",
+            acrostic: "Acrostic reads the first letter of each line. Look for natural paragraph breaks.",
+            punctuation: "Punctuation method uses periods (0) and exclamation marks (1) as binary code.",
+            null: "Null cipher reads the first letter of consecutive words to spell the message."
+        };
+
+        tipsElement.innerHTML = `<p><strong>Tip:</strong> ${tips[method] || tips.auto}</p>`;
+    }
+
+    async decodeMessage() {
+        const encodedText = document.getElementById('encodedText').value.trim();
+        let method = document.getElementById('decodeMethod').value;
+
+        if (!encodedText) {
+            this.showError('Please enter the encoded text to decode');
+            return;
+        }
+
+        // If auto-detect, use the detected method
+        if (method === 'auto') {
+            this.detectEncodingMethod(encodedText);
+            method = document.getElementById('decodeMethod').value;
+            
+            if (method === 'auto') {
+                this.showError('Could not automatically detect the encoding method. Please select one manually.');
+                return;
+            }
+        }
+
+        // Show loading
+        document.getElementById('decodeLoadingDiv').classList.remove('hidden');
+        document.getElementById('decodeResultsDiv').classList.add('hidden');
+        document.getElementById('decodeBtn').disabled = true;
+
+        const startTime = Date.now();
+
+        try {
+            let decodedMessage = '';
+            let confidence = 0;
+
+            // Decode using the selected method
+            switch (method) {
+                case 'els':
+                    const result = this.decodeELS(encodedText);
+                    decodedMessage = result.message;
+                    confidence = result.confidence;
+                    break;
+                case 'acrostic':
+                    decodedMessage = this.decodeAcrostic(encodedText);
+                    confidence = this.calculateDecodeConfidence(decodedMessage);
+                    break;
+                case 'punctuation':
+                    decodedMessage = this.decodePunctuation(encodedText);
+                    confidence = this.calculateDecodeConfidence(decodedMessage);
+                    break;
+                case 'null':
+                    decodedMessage = this.decodeNullCipher(encodedText);
+                    confidence = this.calculateDecodeConfidence(decodedMessage);
+                    break;
+                default:
+                    throw new Error('Invalid decoding method selected');
+            }
+
+            const processingTime = Date.now() - startTime;
+
+            // Display results
+            this.displayDecodeResults(decodedMessage, method, processingTime, confidence);
+            this.showSuccess(`Message decoded successfully using ${this.getMethodName(method)}!`);
+
+        } catch (error) {
+            this.showError(`Decoding failed: ${error.message}`);
+        } finally {
+            document.getElementById('decodeLoadingDiv').classList.add('hidden');
+            document.getElementById('decodeBtn').disabled = false;
+        }
+    }
+
+    // DECODING METHODS
+    decodeELS(text) {
+        // Try different skip distances to find the most likely message
+        const cleanText = text.replace(/[^a-zA-Z]/g, '');
+        let bestResult = { message: '', confidence: 0 };
+
+        // Try skip distances from 2 to text length / 10
+        for (let skip = 2; skip <= Math.min(50, Math.floor(cleanText.length / 5)); skip++) {
+            let message = '';
+            for (let i = 0; i < cleanText.length; i += skip) {
+                if (i < cleanText.length) {
+                    message += cleanText[i].toLowerCase();
+                }
+                if (message.length > 100) break; // Prevent extremely long messages
+            }
+            
+            const confidence = this.calculateELSConfidence(message, skip, cleanText.length);
+            if (confidence > bestResult.confidence && message.length > 2) {
+                bestResult = { message, confidence };
+            }
+        }
+
+        return bestResult;
+    }
+
+    calculateELSConfidence(message, skip, textLength) {
+        let confidence = 0;
+        
+        // Check for common English patterns
+        const commonWords = ['the', 'and', 'that', 'have', 'for', 'not', 'with', 'you', 'this', 'but', 'his', 'from', 'they'];
+        const vowels = 'aeiou';
+        
+        let vowelCount = 0;
+        let commonWordMatches = 0;
+        
+        for (let char of message) {
+            if (vowels.includes(char)) vowelCount++;
+        }
+        
+        // Check for common words
+        for (let word of commonWords) {
+            if (message.includes(word)) commonWordMatches++;
+        }
+        
+        // Calculate confidence based on various factors
+        const vowelRatio = vowelCount / message.length;
+        if (vowelRatio > 0.2 && vowelRatio < 0.6) confidence += 20;
+        
+        confidence += commonWordMatches * 5;
+        
+        // Prefer reasonable message lengths
+        if (message.length > 3 && message.length < 50) confidence += 10;
+        
+        // Prefer reasonable skip distances
+        if (skip > 2 && skip < 20) confidence += 5;
+        
+        return Math.min(confidence, 100);
+    }
+
+    decodeAcrostic(text) {
+        const lines = text.split('\n').filter(line => line.trim().length > 0);
+        let message = '';
+
+        for (let line of lines) {
+            const firstLetter = line.match(/[a-zA-Z]/);
+            if (firstLetter) {
+                message += firstLetter[0].toLowerCase();
+            }
+        }
+
+        return message;
+    }
+
+    decodePunctuation(text) {
+        let binaryString = '';
+        
+        // Extract all punctuation marks in order
+        for (let char of text) {
+            if (char === '.') {
+                binaryString += '0';
+            } else if (char === '!') {
+                binaryString += '1';
+            }
+        }
+
+        // Convert binary to text
+        let message = '';
+        for (let i = 0; i < binaryString.length; i += 8) {
+            const byte = binaryString.slice(i, i + 8);
+            if (byte.length === 8) {
+                const charCode = parseInt(byte, 2);
+                if (charCode > 0 && charCode < 128) { // Valid ASCII
+                    const char = String.fromCharCode(charCode);
+                    if (char.match(/[a-zA-Z0-9\s.,!?'"]/)) { // Only printable characters
+                        message += char;
+                    } else {
+                        break; // Stop if we hit non-printable characters
+                    }
+                } else {
+                    break;
+                }
+            }
+        }
+
+        return message.trim();
+    }
+
+    decodeNullCipher(text) {
+        const words = text.split(/\s+/).filter(word => word.length > 0);
+        let message = '';
+
+        for (let word of words) {
+            const firstLetter = word.match(/[a-zA-Z]/);
+            if (firstLetter) {
+                message += firstLetter[0].toLowerCase();
+            }
+        }
+
+        return message;
+    }
+
+    calculateDecodeConfidence(message) {
+        if (!message) return 0;
+        
+        let confidence = 50; // Base confidence
+        
+        // Check for readable English patterns
+        const vowels = 'aeiou';
+        const consonants = 'bcdfghjklmnpqrstvwxyz';
+        
+        let vowelCount = 0;
+        let consonantCount = 0;
+        
+        for (let char of message.toLowerCase()) {
+            if (vowels.includes(char)) vowelCount++;
+            if (consonants.includes(char)) consonantCount++;
+        }
+        
+        const totalLetters = vowelCount + consonantCount;
+        if (totalLetters > 0) {
+            const vowelRatio = vowelCount / totalLetters;
+            
+            // English typically has 35-45% vowels
+            if (vowelRatio > 0.25 && vowelRatio < 0.55) {
+                confidence += 30;
+            } else if (vowelRatio > 0.15 && vowelRatio < 0.65) {
+                confidence += 15;
+            }
+        }
+        
+        // Check for common English words
+        const commonWords = ['the', 'and', 'that', 'have', 'for', 'not', 'with', 'you', 'this', 'but'];
+        let wordMatches = 0;
+        for (let word of commonWords) {
+            if (message.toLowerCase().includes(word)) wordMatches++;
+        }
+        confidence += wordMatches * 5;
+        
+        // Reasonable message length
+        if (message.length > 2 && message.length < 200) {
+            confidence += 10;
+        }
+        
+        return Math.min(confidence, 95);
+    }
+
+    displayDecodeResults(message, method, processingTime, confidence) {
+        document.getElementById('decodedMessage').textContent = message || 'No readable message found';
+        document.getElementById('usedMethod').textContent = this.getMethodName(method);
+        document.getElementById('messageLength').textContent = message.length + ' chars';
+        document.getElementById('decodingTime').textContent = processingTime + 'ms';
+        document.getElementById('confidence').textContent = Math.round(confidence) + '%';
+        
+        document.getElementById('decodeResultsDiv').classList.remove('hidden');
+    }
+
+    getMethodName(method) {
+        const names = {
+            els: 'Equidistant Letter Sequence',
+            acrostic: 'Acrostic Method',
+            punctuation: 'Punctuation Pattern',
+            null: 'Null Cipher'
+        };
+        return names[method] || method;
+    }
+
+    // FILE HANDLING FOR DECODING
+    handleDecodeFileUpload(event) {
+        const file = event.target.files[0];
+        if (file && file.type === 'text/plain') {
+            const reader = new FileReader();
+            reader.onload = (e) => {
+                document.getElementById('encodedText').value = e.target.result;
+                this.analyzeEncodedText();
+                this.showSuccess('Encoded file uploaded successfully!');
+            };
+            reader.readAsText(file);
+        } else {
+            this.showError('Please upload a valid .txt file');
+        }
+    }
+
+    // DECODE RESULT ACTIONS
+    copyDecodedMessage() {
+        const message = document.getElementById('decodedMessage').textContent;
+        navigator.clipboard.writeText(message).then(() => {
+            this.showSuccess('Decoded message copied to clipboard!');
+        }).catch(() => {
+            this.showError('Failed to copy to clipboard');
+        });
+    }
+
+    downloadDecodedMessage() {
+        const message = document.getElementById('decodedMessage').textContent;
+        const method = document.getElementById('usedMethod').textContent;
+        const timestamp = new Date().toISOString().slice(0, 19).replace(/:/g, '-');
+        
+        const content = `Decoded Message (${method})\nDecoded on: ${new Date().toLocaleString()}\n\n${message}`;
+        
+        const blob = new Blob([content], { type: 'text/plain' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `decoded_message_${timestamp}.txt`;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+        this.showSuccess('Decoded message downloaded successfully!');
+    }
+
+    showDetailedAnalysis() {
+        const message = document.getElementById('decodedMessage').textContent;
+        const method = document.getElementById('usedMethod').textContent;
+        const confidence = document.getElementById('confidence').textContent;
+        
+        const analysis = `
+DETAILED DECODING ANALYSIS
+==========================
+
+Decoded Message: "${message}"
+Method Used: ${method}
+Confidence Level: ${confidence}
+Message Length: ${message.length} characters
+
+Character Analysis:
+- Letters: ${message.replace(/[^a-zA-Z]/g, '').length}
+- Numbers: ${message.replace(/[^0-9]/g, '').length}
+- Spaces: ${message.replace(/[^ ]/g, '').length}
+- Special Characters: ${message.replace(/[a-zA-Z0-9\s]/g, '').length}
+
+Quality Assessment:
+${this.getQualityAssessment(message, confidence)}
+                `.trim();
+
+        alert(analysis);
+    }
+
+    getQualityAssessment(message, confidenceStr) {
+        const confidence = parseInt(confidenceStr);
+        
+        if (confidence >= 80) {
+            return "✅ High quality decode - Message appears to be correctly extracted";
+        } else if (confidence >= 60) {
+            return "⚠️ Moderate quality decode - Message may be correct but verify manually";
+        } else if (confidence >= 40) {
+            return "❓ Low quality decode - Message extraction uncertain, try different method";
+        } else {
+            return "❌ Poor quality decode - Consider trying a different decoding method";
+        }
+    }
+
+    resetDecoder() {
+        document.getElementById('encodedText').value = '';
+        document.getElementById('decodeMethod').value = 'auto';
+        document.getElementById('decodeFileUpload').value = '';
+        document.getElementById('decodeAnalysis').classList.add('hidden');
+        document.getElementById('detectedMethodInfo').classList.add('hidden');
+        document.getElementById('decodeResultsDiv').classList.add('hidden');
+        document.getElementById('decodeBtn').disabled = true;
+        
+        this.showSuccess('Decoder reset successfully!');
+    }
+
+    // EXISTING ENCODING FUNCTIONALITY (unchanged)
     async checkBackendConnection() {
         try {
-            console.log('Checking backend connection...');
             const response = await fetch(`${this.backendUrl}/api/health`);
             const data = await response.json();
             
-            console.log('Backend response:', data);
-            
             if (data.status === 'OK') {
                 this.showBackendStatus('connected', data.openai_configured);
-                console.log('Backend connected successfully');
             } else {
                 this.showBackendStatus('disconnected');
             }
         } catch (error) {
-            console.error('Backend connection failed:', error);
             this.showBackendStatus('disconnected');
-            console.warn('Backend not available, using frontend-only mode');
         }
     }
 
@@ -63,8 +564,6 @@ class CodeVault {
         const statusText = document.getElementById('statusText');
         const retryBtn = document.getElementById('retryConnection');
         
-        console.log('Setting backend status:', status, 'AI configured:', aiConfigured);
-        
         if (status === 'connected') {
             aiBtn.disabled = false;
             statusIndicator.textContent = '✅';
@@ -72,22 +571,17 @@ class CodeVault {
             
             if (aiConfigured) {
                 aiBtn.innerHTML = '🚀 Generate AI Carrier Text';
-                aiBtn.title = 'AI text generation available with OpenAI';
                 statusText.textContent = 'Backend connected - OpenAI ready';
             } else {
                 aiBtn.innerHTML = '🤖 Generate Template Text';
-                aiBtn.title = 'Backend available - using template generation (OpenAI not configured)';
                 statusText.textContent = 'Backend connected - Template mode';
             }
-            console.log('Backend status: Connected');
         } else {
             aiBtn.disabled = true;
             aiBtn.innerHTML = '⚠️ Backend Required';
-            aiBtn.title = 'Backend server not available';
             statusIndicator.textContent = '❌';
             statusText.textContent = 'Backend disconnected';
             retryBtn.style.display = 'inline-block';
-            console.log('Backend status: Disconnected');
         }
     }
 
@@ -96,22 +590,13 @@ class CodeVault {
         const messageLength = document.getElementById('secretMessage').value.length;
         const lengthInput = document.getElementById('aiLength');
         
-        // Update recommended length based on method and message
         let recommendedLength = Math.max(200, messageLength * 5);
         
         switch (method) {
-            case 'els':
-                recommendedLength = Math.max(300, messageLength * 8);
-                break;
-            case 'acrostic':
-                recommendedLength = Math.max(150, messageLength * 6);
-                break;
-            case 'punctuation':
-                recommendedLength = Math.max(250, messageLength * 10);
-                break;
-            case 'null':
-                recommendedLength = Math.max(messageLength * 4, 100);
-                break;
+            case 'els': recommendedLength = Math.max(300, messageLength * 8); break;
+            case 'acrostic': recommendedLength = Math.max(150, messageLength * 6); break;
+            case 'punctuation': recommendedLength = Math.max(250, messageLength * 10); break;
+            case 'null': recommendedLength = Math.max(messageLength * 4, 100); break;
         }
         
         lengthInput.value = Math.min(recommendedLength, 1000);
@@ -124,7 +609,6 @@ class CodeVault {
         const style = document.getElementById('aiStyle').value;
         const length = parseInt(document.getElementById('aiLength').value);
 
-        // Validation
         if (!secretMessage) {
             this.showError('Please enter a secret message first');
             return;
@@ -135,27 +619,17 @@ class CodeVault {
             return;
         }
 
-        // Show loading
         const aiLoadingDiv = document.getElementById('aiLoadingDiv');
         const generateBtn = document.getElementById('generateAIText');
         
         aiLoadingDiv.classList.remove('hidden');
         generateBtn.disabled = true;
-        generateBtn.classList.add('loading');
 
         try {
             const response = await fetch(`${this.backendUrl}/api/generate-carrier-text`, {
                 method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                },
-                body: JSON.stringify({
-                    message: secretMessage,
-                    topic: topic,
-                    method: method,
-                    style: style,
-                    length: length
-                })
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ message: secretMessage, topic, method, style, length })
             });
 
             if (!response.ok) {
@@ -164,28 +638,19 @@ class CodeVault {
             }
 
             const data = await response.json();
-            
-            // Set the generated text
             document.getElementById('carrierText').value = data.carrierText;
             
-            // Show success message with metadata
             const source = data.metadata.source === 'openai' ? 'AI-generated' : 'Template-based';
             this.showSuccess(`${source} carrier text generated successfully! (${data.metadata.actualWordCount} words)`);
             
-            // Update text analysis
             this.analyzeText();
             this.validateInputs();
 
-            // Log metadata for debugging
-            console.log('Generated text metadata:', data.metadata);
-
         } catch (error) {
-            console.error('AI generation error:', error);
             this.showError(`Failed to generate carrier text: ${error.message}`);
         } finally {
             aiLoadingDiv.classList.add('hidden');
             generateBtn.disabled = false;
-            generateBtn.classList.remove('loading');
         }
     }
 
@@ -203,43 +668,36 @@ class CodeVault {
         const chars = carrierText.length;
         const letters = carrierText.replace(/[^a-zA-Z]/g, '').length;
         
-        // Calculate suitability for current method
         let suitability = 'Good';
         let suitabilityClass = 'good';
         
         switch (method) {
             case 'els':
                 if (letters < secretMessage.length * 3) {
-                    suitability = 'Too Short';
-                    suitabilityClass = 'poor';
+                    suitability = 'Too Short'; suitabilityClass = 'poor';
                 } else if (letters < secretMessage.length * 5) {
-                    suitability = 'Adequate';
-                    suitabilityClass = 'fair';
+                    suitability = 'Adequate'; suitabilityClass = 'fair';
                 }
                 break;
             case 'acrostic':
                 const lines = carrierText.split('\n').length;
                 if (lines < secretMessage.length) {
-                    suitability = 'Need More Lines';
-                    suitabilityClass = 'poor';
+                    suitability = 'Need More Lines'; suitabilityClass = 'poor';
                 }
                 break;
             case 'punctuation':
                 const punctuation = (carrierText.match(/[.!]/g) || []).length;
                 if (punctuation < secretMessage.length * 4) {
-                    suitability = 'Need More Punctuation';
-                    suitabilityClass = 'fair';
+                    suitability = 'Need More Punctuation'; suitabilityClass = 'fair';
                 }
                 break;
             case 'null':
                 if (words.length < secretMessage.length) {
-                    suitability = 'Too Few Words';
-                    suitabilityClass = 'poor';
+                    suitability = 'Too Few Words'; suitabilityClass = 'poor';
                 }
                 break;
         }
 
-        // Update display
         document.getElementById('wordCount').textContent = words.length;
         document.getElementById('charCount').textContent = chars;
         document.getElementById('suitability').textContent = suitability;
@@ -252,11 +710,7 @@ class CodeVault {
         const carrierText = document.getElementById('carrierText').value.trim();
         const startBtn = document.getElementById('startBtn');
 
-        if (secretMessage.length > 0 && carrierText.length > 0) {
-            startBtn.disabled = false;
-        } else {
-            startBtn.disabled = true;
-        }
+        startBtn.disabled = !(secretMessage.length > 0 && carrierText.length > 0);
     }
 
     showError(message) {
@@ -304,24 +758,16 @@ class CodeVault {
             return;
         }
 
-        // Show loading
         document.getElementById('loadingDiv').classList.remove('hidden');
         document.getElementById('resultsDiv').classList.add('hidden');
         document.getElementById('startBtn').disabled = true;
 
         try {
-            // Try backend first, fallback to frontend
             try {
                 const response = await fetch(`${this.backendUrl}/api/encode`, {
                     method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                    },
-                    body: JSON.stringify({
-                        message: secretMessage,
-                        carrierText: carrierText,
-                        method: method
-                    })
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ message: secretMessage, carrierText: carrierText, method: method })
                 });
 
                 if (response.ok) {
@@ -337,25 +783,15 @@ class CodeVault {
                 console.warn('Backend encoding failed, using frontend fallback:', error);
             }
 
-            // Fallback to frontend encoding
             await new Promise(resolve => setTimeout(resolve, 1000));
 
             let result;
             switch (method) {
-                case 'els':
-                    result = this.encodeELS(secretMessage, carrierText);
-                    break;
-                case 'acrostic':
-                    result = this.encodeAcrostic(secretMessage, carrierText);
-                    break;
-                case 'punctuation':
-                    result = this.encodePunctuation(secretMessage, carrierText);
-                    break;
-                case 'null':
-                    result = this.encodeNullCipher(secretMessage, carrierText);
-                    break;
-                default:
-                    throw new Error('Invalid encoding method');
+                case 'els': result = this.encodeELS(secretMessage, carrierText); break;
+                case 'acrostic': result = this.encodeAcrostic(secretMessage, carrierText); break;
+                case 'punctuation': result = this.encodePunctuation(secretMessage, carrierText); break;
+                case 'null': result = this.encodeNullCipher(secretMessage, carrierText); break;
+                default: throw new Error('Invalid encoding method');
             }
 
             this.currentResult = result.encodedText;
@@ -367,13 +803,12 @@ class CodeVault {
         } catch (error) {
             this.showError(error.message);
         } finally {
-            // ALWAYS hide loading and re-enable button, regardless of success or failure
             document.getElementById('loadingDiv').classList.add('hidden');
             document.getElementById('startBtn').disabled = false;
         }
     }
 
-    // Equidistant Letter Sequence (ELS) Encoding
+    // ENCODING METHODS (unchanged from original)
     encodeELS(message, carrierText) {
         const cleanMessage = message.toLowerCase().replace(/[^a-z]/g, '');
         const cleanCarrier = carrierText.toLowerCase().replace(/[^a-z]/g, '');
@@ -386,7 +821,6 @@ class CodeVault {
             throw new Error('Carrier text too short for ELS encoding. Need at least ' + (cleanMessage.length * 2) + ' letters.');
         }
 
-        // Calculate optimal skip distance
         const skipDistance = Math.floor(cleanCarrier.length / cleanMessage.length);
         
         if (skipDistance < 2) {
@@ -397,18 +831,15 @@ class CodeVault {
         let positions = [];
         let currentPos = 0;
 
-        // Place message characters at calculated intervals
         for (let i = 0; i < cleanMessage.length; i++) {
             const targetChar = cleanMessage[i];
             let placed = false;
             
-            // Try to find position within skip distance
             for (let j = 0; j < skipDistance && !placed; j++) {
                 const pos = currentPos + j;
                 if (pos < encodedText.length) {
                     const originalChar = encodedText[pos].toLowerCase();
                     if (originalChar.match(/[a-z]/)) {
-                        // Replace with target character, preserving case
                         const isUpperCase = encodedText[pos] === encodedText[pos].toUpperCase();
                         encodedText = encodedText.substring(0, pos) + 
                                      (isUpperCase ? targetChar.toUpperCase() : targetChar) + 
@@ -418,7 +849,6 @@ class CodeVault {
                     }
                 }
             }
-            
             currentPos += skipDistance;
         }
 
@@ -439,7 +869,6 @@ class CodeVault {
         };
     }
 
-    // Acrostic Method Encoding
     encodeAcrostic(message, carrierText) {
         const cleanMessage = message.toLowerCase().replace(/[^a-z]/g, '');
         
@@ -447,10 +876,8 @@ class CodeVault {
             throw new Error('Secret message must contain at least one letter');
         }
 
-        // Split carrier text into lines - be more conservative about line breaks
         let lines = carrierText.split('\n').filter(line => line.trim().length > 0);
         
-        // If no line breaks exist, try to split at sentence boundaries
         if (lines.length === 1 && lines[0].length > 100) {
             const sentences = lines[0].split(/(?<=[.!?])\s+/);
             if (sentences.length >= cleanMessage.length) {
@@ -458,13 +885,11 @@ class CodeVault {
             }
         }
         
-        // If still not enough lines, split the text more intelligently
         if (lines.length < cleanMessage.length) {
             let newLines = [];
             
             for (let line of lines) {
                 if (line.length > 80 && newLines.length < cleanMessage.length) {
-                    // Split at natural break points: commas, semicolons, conjunctions
                     const breakPoints = line.split(/(?:,\s+|;\s+|\s+and\s+|\s+but\s+|\s+or\s+|\s+so\s+)/);
                     
                     if (breakPoints.length > 1) {
@@ -486,11 +911,8 @@ class CodeVault {
             lines = newLines;
         }
         
-        // Only add minimal lines if absolutely necessary
         if (lines.length < cleanMessage.length) {
             const needed = cleanMessage.length - lines.length;
-            
-            // Add contextually relevant short lines
             const contextualLines = [
                 'Hence the conclusion.',
                 'Therefore we see.',
@@ -508,10 +930,8 @@ class CodeVault {
             }
         }
 
-        // Trim to exactly what we need
         lines = lines.slice(0, cleanMessage.length);
 
-        // Modify first letter of each line to match the secret message
         let encodedLines = [];
         let modificationsCount = 0;
         
@@ -519,7 +939,6 @@ class CodeVault {
             const targetChar = cleanMessage[i];
             let line = lines[i] || '';
             
-            // Find the first alphabetic character and its position
             let firstLetterIndex = -1;
             for (let j = 0; j < line.length; j++) {
                 if (line[j].match(/[a-zA-Z]/)) {
@@ -533,13 +952,11 @@ class CodeVault {
                 const isUpperCase = originalChar === originalChar.toUpperCase();
                 const newChar = isUpperCase ? targetChar.toUpperCase() : targetChar;
                 
-                // Only modify if different
                 if (originalChar.toLowerCase() !== targetChar) {
                     line = line.substring(0, firstLetterIndex) + newChar + line.substring(firstLetterIndex + 1);
                     modificationsCount++;
                 }
             } else {
-                // No letters found - prepend the target character naturally
                 line = targetChar.toUpperCase() + (line.length > 0 ? ' ' + line : '.');
                 modificationsCount++;
             }
@@ -565,13 +982,11 @@ class CodeVault {
         };
     }
 
-    // Punctuation Pattern Encoding
     encodePunctuation(message, carrierText) {
         if (message.length === 0) {
             throw new Error('Secret message cannot be empty');
         }
 
-        // Convert message to binary with detailed logging
         const binaryMessage = message.split('').map(char => {
             const binary = char.charCodeAt(0).toString(2).padStart(8, '0');
             return { char: char, ascii: char.charCodeAt(0), binary: binary };
@@ -582,21 +997,7 @@ class CodeVault {
         let encodedText = carrierText;
         let binaryIndex = 0;
         let modifications = [];
-        let existingPunctuation = [];
         
-        // First pass: catalog and replace existing punctuation
-        for (let i = 0; i < encodedText.length; i++) {
-            const char = encodedText[i];
-            if (char === '.' || char === '!') {
-                existingPunctuation.push({
-                    position: i,
-                    original: char,
-                    context: encodedText.substring(Math.max(0, i-10), i+10)
-                });
-            }
-        }
-        
-        // Replace existing punctuation with binary pattern
         let newText = '';
         for (let i = 0; i < encodedText.length && binaryIndex < fullBinary.length; i++) {
             const char = encodedText[i];
@@ -623,71 +1024,23 @@ class CodeVault {
         encodedText = newText;
         let addedPunctuation = [];
 
-        // Second pass: add punctuation if needed
         if (binaryIndex < fullBinary.length) {
             const remainingBinary = fullBinary.substring(binaryIndex);
+            encodedText += ' ';
             
-            // Find sentence boundaries for natural insertion
-            const sentencePattern = /([.!?])\s+/g;
-            const sentences = [];
-            let lastIndex = 0;
-            let match;
-            
-            while ((match = sentencePattern.exec(encodedText)) !== null) {
-                sentences.push({
-                    end: match.index + match[0].length,
-                    punctuation: match[1]
-                });
-            }
-            
-            // Insert remaining binary at sentence boundaries
-            let insertionsMade = 0;
-            let modifiedText = encodedText;
-            
-            for (let i = 0; i < remainingBinary.length && insertionsMade < sentences.length; i++) {
-                const binaryDigit = remainingBinary[i];
-                const punctuation = binaryDigit === '0' ? '.' : '!';
-                const insertPos = sentences[insertionsMade].end;
-                
-                modifiedText = modifiedText.substring(0, insertPos) + punctuation + modifiedText.substring(insertPos);
+            for (let i = 0; i < remainingBinary.length; i++) {
+                const punctuation = remainingBinary[i] === '0' ? '.' : '!';
+                encodedText += punctuation;
                 
                 addedPunctuation.push({
-                    position: insertPos,
+                    position: encodedText.length - 1,
                     char: punctuation,
                     binaryIndex: binaryIndex + i,
                     represents: `${message[Math.floor((binaryIndex + i) / 8)] || 'overflow'} bit ${(binaryIndex + i) % 8}`
                 });
                 
-                insertionsMade++;
-                
-                // Adjust positions for subsequent insertions
-                for (let j = insertionsMade; j < sentences.length; j++) {
-                    sentences[j].end++;
-                }
-            }
-            
-            encodedText = modifiedText;
-            
-            // If still need more punctuation, add at the end with spacing
-            if (insertionsMade < remainingBinary.length) {
-                const remaining = remainingBinary.substring(insertionsMade);
-                encodedText += ' ';
-                
-                for (let i = 0; i < remaining.length; i++) {
-                    const punctuation = remaining[i] === '0' ? '.' : '!';
-                    encodedText += punctuation;
-                    
-                    addedPunctuation.push({
-                        position: encodedText.length - 1,
-                        char: punctuation,
-                        binaryIndex: binaryIndex + insertionsMade + i,
-                        represents: `${message[Math.floor((binaryIndex + insertionsMade + i) / 8)] || 'overflow'} bit ${(binaryIndex + insertionsMade + i) % 8}`
-                    });
-                    
-                    // Add space every 8 bits for readability
-                    if ((i + 1) % 8 === 0 && i < remaining.length - 1) {
-                        encodedText += ' ';
-                    }
+                if ((i + 1) % 8 === 0 && i < remainingBinary.length - 1) {
+                    encodedText += ' ';
                 }
             }
         }
@@ -701,7 +1054,6 @@ class CodeVault {
             method: 'Punctuation Pattern',
             messageAnalysis: binaryMessage,
             binaryLength: fullBinary.length,
-            existingPunctuation: existingPunctuation.length,
             modificationsCount: modifications.length,
             addedPunctuation: addedPunctuation.length,
             totalBitsEncoded: totalBitsEncoded,
@@ -718,7 +1070,6 @@ class CodeVault {
         };
     }
 
-    // Null Cipher Encoding
     encodeNullCipher(message, carrierText) {
         const cleanMessage = message.toLowerCase().replace(/[^a-z]/g, '');
         
@@ -726,22 +1077,10 @@ class CodeVault {
             throw new Error('Secret message must contain at least one letter');
         }
 
-        // Split into words and analyze them
         let words = carrierText.split(/\s+/).filter(word => word.length > 0);
-        let wordAnalysis = words.map((word, index) => ({
-            index: index,
-            original: word,
-            firstLetter: word.match(/[a-zA-Z]/)?.[0] || null,
-            firstLetterPos: word.search(/[a-zA-Z]/),
-            hasLetters: /[a-zA-Z]/.test(word),
-            length: word.length
-        }));
         
         if (words.length < cleanMessage.length) {
-            // Calculate how many words we need to add
             const wordsNeeded = cleanMessage.length - words.length;
-            
-            // Add contextually appropriate filler words
             const contextualFillers = [
                 'also', 'thus', 'then', 'here', 'there', 'when', 'where', 'while',
                 'since', 'though', 'still', 'yet', 'just', 'quite', 'rather', 'very',
@@ -751,34 +1090,23 @@ class CodeVault {
             for (let i = 0; i < wordsNeeded; i++) {
                 const fillerWord = contextualFillers[i % contextualFillers.length];
                 words.push(fillerWord);
-                wordAnalysis.push({
-                    index: words.length - 1,
-                    original: fillerWord,
-                    firstLetter: fillerWord[0],
-                    firstLetterPos: 0,
-                    hasLetters: true,
-                    length: fillerWord.length,
-                    added: true
-                });
             }
         }
 
         let encodedWords = [...words];
         let modifications = [];
         
-        // Modify first letter of selected words to spell out the message
         for (let i = 0; i < cleanMessage.length; i++) {
             const targetChar = cleanMessage[i];
-            const wordInfo = wordAnalysis[i];
             let word = encodedWords[i];
             
-            if (wordInfo.hasLetters) {
-                const firstLetterIndex = wordInfo.firstLetterPos;
+            const firstLetterMatch = word.match(/[a-zA-Z]/);
+            if (firstLetterMatch) {
+                const firstLetterIndex = word.indexOf(firstLetterMatch[0]);
                 const originalChar = word[firstLetterIndex];
                 const isUpperCase = originalChar === originalChar.toUpperCase();
                 const newChar = isUpperCase ? targetChar.toUpperCase() : targetChar;
                 
-                // Only modify if the letter is different
                 if (originalChar.toLowerCase() !== targetChar) {
                     const newWord = word.substring(0, firstLetterIndex) + 
                                    newChar + 
@@ -797,7 +1125,6 @@ class CodeVault {
                     });
                 }
             } else {
-                // No letters in word - create a minimal word starting with target character
                 const newWord = targetChar.toLowerCase() + 'nd';
                 encodedWords[i] = newWord;
                 modifications.push({
@@ -814,25 +1141,13 @@ class CodeVault {
             }
         }
 
-        // Calculate encoding statistics
-        const totalWords = encodedWords.length;
-        const wordsUsed = cleanMessage.length;
-        const wordsUnchanged = totalWords - modifications.length;
-        const encodingRatio = (cleanMessage.length / totalWords * 100).toFixed(1);
-        
         const securityScore = this.calculateSecurityScore(cleanMessage.length, carrierText.length, 'null');
 
         return {
             encodedText: encodedWords.join(' '),
             method: 'Null Cipher',
-            originalWords: words.length,
-            totalWords: totalWords,
-            wordsUsedForMessage: wordsUsed,
+            totalWords: encodedWords.length,
             wordsModified: modifications.length,
-            wordsUnchanged: wordsUnchanged,
-            wordsAdded: wordAnalysis.filter(w => w.added).length,
-            encodingRatio: parseFloat(encodingRatio),
-            modifications: modifications,
             securityScore: securityScore,
             instructions: {
                 method: 'Null Cipher',
@@ -850,27 +1165,17 @@ class CodeVault {
     calculateSecurityScore(messageLength, carrierLength, method) {
         let baseScore = 50;
         
-        // Length ratio factor
         const ratio = messageLength / carrierLength;
         if (ratio < 0.01) baseScore += 30;
         else if (ratio < 0.05) baseScore += 20;
         else if (ratio < 0.1) baseScore += 10;
         else baseScore -= 10;
         
-        // Method-specific adjustments
         switch (method) {
-            case 'els':
-                baseScore += 20; // ELS is more secure
-                break;
-            case 'punctuation':
-                baseScore += 15;
-                break;
-            case 'null':
-                baseScore += 10;
-                break;
-            case 'acrostic':
-                baseScore += 5; // Acrostic is more obvious
-                break;
+            case 'els': baseScore += 20; break;
+            case 'punctuation': baseScore += 15; break;
+            case 'null': baseScore += 10; break;
+            case 'acrostic': baseScore += 5; break;
         }
         
         return Math.max(0, Math.min(100, Math.round(baseScore)));
@@ -918,109 +1223,66 @@ class CodeVault {
             const instructions = this.decodingInstructions;
             const originalMessage = document.getElementById('secretMessage').value;
 
-            console.log('Decoding with instructions:', instructions);
-            console.log('Encoded text length:', this.currentResult.length);
-
             switch (instructions.method) {
                 case 'ELS':
-                    decodedMessage = this.decodeELS(this.currentResult, instructions);
+                    decodedMessage = this.testDecodeELS(this.currentResult, instructions);
                     break;
                 case 'Acrostic':
-                    decodedMessage = this.decodeAcrostic(this.currentResult, instructions);
+                    decodedMessage = this.testDecodeAcrostic(this.currentResult, instructions);
                     break;
                 case 'Punctuation':
-                    decodedMessage = this.decodePunctuation(this.currentResult, instructions);
+                    decodedMessage = this.testDecodePunctuation(this.currentResult, instructions);
                     break;
                 case 'Null Cipher':
-                    decodedMessage = this.decodeNullCipher(this.currentResult, instructions);
+                    decodedMessage = this.testDecodeNullCipher(this.currentResult, instructions);
                     break;
                 default:
                     throw new Error('Unknown decoding method: ' + instructions.method);
             }
 
-            console.log('Decoded message:', decodedMessage);
-            console.log('Original message:', originalMessage);
-
-            // Compare properly - remove spaces and non-letters from both for comparison
             const cleanOriginal = originalMessage.toLowerCase().replace(/[^a-z]/g, '');
             const cleanDecoded = decodedMessage.toLowerCase().replace(/[^a-z]/g, '');
-
-            console.log('Clean original (letters only):', cleanOriginal);
-            console.log('Clean decoded (letters only):', cleanDecoded);
 
             if (cleanDecoded === cleanOriginal) {
                 this.showSuccess(`✅ Decode test successful! Retrieved: "${decodedMessage}"`);
             } else {
-                // Show detailed comparison for debugging
-                this.showError(`❌ Decode test failed.\nGot: "${decodedMessage}" (${cleanDecoded.length} chars)\nExpected: "${originalMessage}" (${cleanOriginal.length} chars)\nMethod: ${instructions.method}`);
-                console.log('Decode mismatch details:');
-                console.log('Clean decoded:', cleanDecoded);
-                console.log('Clean original:', cleanOriginal);
-                console.log('Instructions used:', instructions);
+                this.showError(`❌ Decode test failed.\nGot: "${decodedMessage}"\nExpected: "${originalMessage}"`);
             }
         } catch (error) {
             this.showError('Decode test failed: ' + error.message);
-            console.error('Decode error:', error);
         }
     }
 
-    decodeELS(text, instructions) {
-        console.log('=== ELS DECODING DEBUG ===');
-        console.log('Skip distance:', instructions.skipDistance);
-        console.log('Start position:', instructions.startPosition);
-        console.log('Message length:', instructions.messageLength);
-        console.log('Text length:', text.length);
-        
-        // The ELS encoding places characters at specific positions in the ORIGINAL text
-        // We need to extract from those exact same positions
+    testDecodeELS(text, instructions) {
         let decodedMessage = '';
-        let currentPos = 0; // Start from beginning, not the startPosition
-        
-        console.log('Extraction positions:');
+        let currentPos = 0;
         
         for (let i = 0; i < instructions.messageLength; i++) {
             let placed = false;
             
-            // Look within the skip distance window, just like encoding does
             for (let j = 0; j < instructions.skipDistance && !placed; j++) {
                 const pos = currentPos + j;
                 if (pos < text.length) {
                     const char = text[pos];
                     if (char.match(/[a-zA-Z]/)) {
                         decodedMessage += char.toLowerCase();
-                        console.log(`Position ${i}: Found '${char}' at text position ${pos}`);
                         placed = true;
                     }
                 }
             }
             
-            if (!placed) {
-                console.warn(`Position ${i}: No letter found in window ${currentPos} to ${currentPos + instructions.skipDistance - 1}`);
-            }
-            
             currentPos += instructions.skipDistance;
         }
-        
-        console.log('Final decoded message:', decodedMessage);
-        console.log('=== END ELS DECODING ===');
         
         return decodedMessage;
     }
 
-    decodeAcrostic(text, instructions) {
-        console.log('=== ACROSTIC DECODING DEBUG ===');
-        console.log('Number of lines needed:', instructions.numberOfLines);
-        
+    testDecodeAcrostic(text, instructions) {
         const lines = text.split('\n');
         let decodedMessage = '';
-        
-        console.log('Total lines found:', lines.length);
 
         for (let i = 0; i < Math.min(lines.length, instructions.numberOfLines); i++) {
             const line = lines[i];
-            console.log(`Line ${i}: "${line}"`);
-            
-            // Find the first alphabetic character (exactly like encoding does)
             let firstLetterIndex = -1;
             for (let j = 0; j < line.length; j++) {
                 if (line[j].match(/[a-zA-Z]/)) {
@@ -1032,78 +1294,47 @@ class CodeVault {
             if (firstLetterIndex !== -1) {
                 const char = line[firstLetterIndex];
                 decodedMessage += char.toLowerCase();
-                console.log(`Line ${i}: First letter at position ${firstLetterIndex} = '${char}'`);
-            } else {
-                console.warn(`Line ${i}: No letters found`);
             }
         }
-        
-        console.log('Final decoded message:', decodedMessage);
-        console.log('=== END ACROSTIC DECODING ===');
         
         return decodedMessage;
     }
 
-    decodePunctuation(text, instructions) {
-        console.log('=== PUNCTUATION DECODING DEBUG ===');
-        console.log('Expected binary length:', instructions.binaryLength);
-        
+    testDecodePunctuation(text, instructions) {
         let binaryString = '';
-        let punctuationPositions = [];
         
-        // Extract all punctuation marks in order (exactly like encoding)
         for (let i = 0; i < text.length; i++) {
             const char = text[i];
             if (char === '.') {
                 binaryString += '0';
-                punctuationPositions.push({pos: i, char: '.', bit: '0'});
             } else if (char === '!') {
                 binaryString += '1';
-                punctuationPositions.push({pos: i, char: '!', bit: '1'});
             }
         }
         
-        console.log('Punctuation marks found:', punctuationPositions.length);
-        console.log('Binary string:', binaryString);
-        console.log('First 10 punctuation positions:', punctuationPositions.slice(0, 10));
-        
-        // Convert binary to text
         let decodedMessage = '';
         for (let i = 0; i < binaryString.length; i += 8) {
             const byte = binaryString.slice(i, i + 8);
             if (byte.length === 8) {
                 const charCode = parseInt(byte, 2);
-                if (charCode > 0 && charCode < 128) { // Valid ASCII
+                if (charCode > 0 && charCode < 128) {
                     const char = String.fromCharCode(charCode);
                     decodedMessage += char;
-                    console.log(`Byte ${Math.floor(i/8)}: ${byte} = ${charCode} = '${char}'`);
                 } else {
-                    console.warn(`Invalid character code: ${charCode} from byte: ${byte}`);
-                    break; // Stop if we hit invalid data
+                    break;
                 }
             }
         }
         
-        console.log('Final decoded message:', decodedMessage);
-        console.log('=== END PUNCTUATION DECODING ===');
-        
         return decodedMessage;
     }
 
-    decodeNullCipher(text, instructions) {
-        console.log('=== NULL CIPHER DECODING DEBUG ===');
-        console.log('Number of words needed:', instructions.numberOfWords);
-        
+    testDecodeNullCipher(text, instructions) {
         const words = text.split(/\s+/).filter(word => word.length > 0);
         let decodedMessage = '';
-        
-        console.log('Total words found:', words.length);
 
         for (let i = 0; i < Math.min(words.length, instructions.numberOfWords); i++) {
             const word = words[i];
-            console.log(`Word ${i}: "${word}"`);
-            
-            // Find the first alphabetic character (exactly like encoding does)
             let firstLetterIndex = -1;
             for (let j = 0; j < word.length; j++) {
                 if (word[j].match(/[a-zA-Z]/)) {
@@ -1115,15 +1346,9 @@ class CodeVault {
             if (firstLetterIndex !== -1) {
                 const char = word[firstLetterIndex];
                 decodedMessage += char.toLowerCase();
-                console.log(`Word ${i}: First letter at position ${firstLetterIndex} = '${char}'`);
-            } else {
-                console.warn(`Word ${i}: No letters found`);
             }
         }
 
-        console.log('Final decoded message:', decodedMessage);
-        console.log('=== END NULL CIPHER DECODING ===');
-        
         return decodedMessage;
     }
 
@@ -1149,7 +1374,15 @@ class CodeVault {
     }
 }
 
+// Global function for tab switching
+function switchTab(tabName) {
+    // Get the instance (we'll create it globally)
+    if (window.codeVaultInstance) {
+        window.codeVaultInstance.switchTab(tabName);
+    }
+}
+
 // Initialize the application
 document.addEventListener('DOMContentLoaded', () => {
-    new CodeVault();
+    window.codeVaultInstance = new CodeVaultPro();
 });

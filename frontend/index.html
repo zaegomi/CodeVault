@@ -13,101 +13,190 @@
             <p>Universal Text-Based Steganography Platform</p>
         </div>
 
-        <div class="main-content">
-            <div class="panel">
-                <h2>Secret Message</h2>
-                <div class="form-group">
-                    <label for="secretMessage">Enter your secret message:</label>
-                    <input type="text" id="secretMessage" placeholder="Type your hidden message here..." maxlength="500">
-                </div>
-                
-                <div class="form-group">
-                    <label for="encryptionMethod">Select Encoding Method:</label>
-                    <select id="encryptionMethod">
-                        <option value="els">Equidistant Letter Sequence (ELS)</option>
-                        <option value="acrostic">Acrostic Method</option>
-                        <option value="punctuation">Punctuation Pattern</option>
-                        <option value="null">Null Cipher</option>
-                    </select>
-                </div>
+        <!-- Navigation Tabs -->
+        <div class="nav-tabs">
+            <button class="nav-tab active" onclick="switchTab('encode')">🔐 Encode Messages</button>
+            <button class="nav-tab" onclick="switchTab('decode')">🔓 Decode Messages</button>
+        </div>
 
-                <!-- NEW: AI Text Generation Controls -->
-                <div class="ai-generation-panel">
-                    <h3>🤖 AI Carrier Text Generation</h3>
+        <!-- ENCODING TAB -->
+        <div id="encodeTab" class="tab-content active">
+            <div class="main-content">
+                <div class="panel">
+                    <h2>Secret Message</h2>
                     <div class="form-group">
-                        <label for="aiTopic">Topic for carrier text:</label>
-                        <input type="text" id="aiTopic" placeholder="e.g., technology, nature, business..." value="technology">
+                        <label for="secretMessage">Enter your secret message:</label>
+                        <input type="text" id="secretMessage" placeholder="Type your hidden message here..." maxlength="500">
                     </div>
                     
                     <div class="form-group">
-                        <label for="aiStyle">Writing style:</label>
-                        <select id="aiStyle">
-                            <option value="casual">Casual</option>
-                            <option value="academic">Academic</option>
-                            <option value="business">Business</option>
-                            <option value="creative">Creative</option>
-                            <option value="news">News</option>
+                        <label for="encryptionMethod">Select Encoding Method:</label>
+                        <select id="encryptionMethod">
+                            <option value="els">Equidistant Letter Sequence (ELS)</option>
+                            <option value="acrostic">Acrostic Method</option>
+                            <option value="punctuation">Punctuation Pattern</option>
+                            <option value="null">Null Cipher</option>
                         </select>
                     </div>
+
+                    <!-- AI Text Generation Controls -->
+                    <div class="ai-generation-panel">
+                        <h3>🤖 AI Carrier Text Generation</h3>
+                        <div class="form-group">
+                            <label for="aiTopic">Topic for carrier text:</label>
+                            <input type="text" id="aiTopic" placeholder="e.g., technology, nature, business..." value="technology">
+                        </div>
+                        
+                        <div class="form-group">
+                            <label for="aiStyle">Writing style:</label>
+                            <select id="aiStyle">
+                                <option value="casual">Casual</option>
+                                <option value="academic">Academic</option>
+                                <option value="business">Business</option>
+                                <option value="creative">Creative</option>
+                                <option value="news">News</option>
+                            </select>
+                        </div>
+                        
+                        <div class="form-group">
+                            <label for="aiLength">Text length (words):</label>
+                            <input type="number" id="aiLength" min="50" max="1000" value="200">
+                        </div>
+                        
+                        <button class="ai-generate-btn" id="generateAIText">🚀 Generate AI Carrier Text</button>
+                        
+                        <div class="backend-status" id="backendStatus">
+                            <small>
+                                <span id="statusIndicator">🔄</span>
+                                <span id="statusText">Checking backend connection...</span>
+                                <button class="retry-btn" id="retryConnection" style="display: none;">Retry</button>
+                            </small>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="panel">
+                    <h2>Carrier Text</h2>
+                    <div class="form-group">
+                        <label for="carrierText">Enter or paste your carrier text:</label>
+                        <textarea id="carrierText" placeholder="Enter the text that will hide your message..."></textarea>
+                    </div>
                     
                     <div class="form-group">
-                        <label for="aiLength">Text length (words):</label>
-                        <input type="number" id="aiLength" min="50" max="1000" value="200">
-                    </div>
-                    
-                    <button class="ai-generate-btn" id="generateAIText">🚀 Generate AI Carrier Text</button>
-                    
-                    <div class="backend-status" id="backendStatus">
-                        <small>
-                            <span id="statusIndicator">🔄</span>
-                            <span id="statusText">Checking backend connection...</span>
-                            <button class="retry-btn" id="retryConnection" style="display: none;">Retry</button>
-                        </small>
-                    </div>
-                </div>
-            </div>
-
-            <div class="panel">
-                <h2>Carrier Text</h2>
-                <div class="form-group">
-                    <label for="carrierText">Enter or paste your carrier text:</label>
-                    <textarea id="carrierText" placeholder="Enter the text that will hide your message..."></textarea>
-                </div>
-                
-                <div class="form-group">
-                    <label>Or upload a text file:</label>
-                    <div class="file-upload">
-                        <input type="file" id="fileUpload" accept=".txt">
-                        <div class="file-upload-btn">📁 Upload Text File</div>
-                    </div>
-                </div>
-
-                <!-- NEW: Text Analysis Display -->
-                <div id="textAnalysis" class="text-analysis hidden">
-                    <h4>📊 Text Analysis</h4>
-                    <div class="analysis-stats">
-                        <div class="analysis-item">
-                            <span class="analysis-label">Word Count:</span>
-                            <span class="analysis-value" id="wordCount">0</span>
+                        <label>Or upload a text file:</label>
+                        <div class="file-upload">
+                            <input type="file" id="fileUpload" accept=".txt">
+                            <div class="file-upload-btn">📁 Upload Text File</div>
                         </div>
-                        <div class="analysis-item">
-                            <span class="analysis-label">Character Count:</span>
-                            <span class="analysis-value" id="charCount">0</span>
-                        </div>
-                        <div class="analysis-item">
-                            <span class="analysis-label">Suitability:</span>
-                            <span class="analysis-value" id="suitability">-</span>
+                    </div>
+
+                    <!-- Text Analysis Display -->
+                    <div id="textAnalysis" class="text-analysis hidden">
+                        <h4>📊 Text Analysis</h4>
+                        <div class="analysis-stats">
+                            <div class="analysis-item">
+                                <span class="analysis-label">Word Count:</span>
+                                <span class="analysis-value" id="wordCount">0</span>
+                            </div>
+                            <div class="analysis-item">
+                                <span class="analysis-label">Character Count:</span>
+                                <span class="analysis-value" id="charCount">0</span>
+                            </div>
+                            <div class="analysis-item">
+                                <span class="analysis-label">Suitability:</span>
+                                <span class="analysis-value" id="suitability">-</span>
+                            </div>
                         </div>
                     </div>
                 </div>
             </div>
+
+            <div class="control-panel">
+                <button class="start-btn" id="startBtn">START ENCODING</button>
+            </div>
         </div>
 
-        <div class="control-panel">
-            <button class="start-btn" id="startBtn">START ENCODING</button>
+        <!-- DECODING TAB -->
+        <div id="decodeTab" class="tab-content">
+            <div class="main-content">
+                <div class="panel decode-panel">
+                    <h2>🔍 Message Decoder</h2>
+                    <div class="form-group">
+                        <label for="encodedText">Enter the encoded text:</label>
+                        <textarea id="encodedText" placeholder="Paste the text that contains the hidden message..."></textarea>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label>Or upload an encoded text file:</label>
+                        <div class="file-upload">
+                            <input type="file" id="decodeFileUpload" accept=".txt">
+                            <div class="file-upload-btn">📁 Upload Encoded File</div>
+                        </div>
+                    </div>
+
+                    <!-- Method Detection/Selection -->
+                    <div class="method-detection">
+                        <h4>🔍 Encoding Method Detection</h4>
+                        <div class="form-group">
+                            <label for="decodeMethod">Select or let us detect the method:</label>
+                            <select id="decodeMethod">
+                                <option value="auto">🤖 Auto-Detect Method</option>
+                                <option value="els">Equidistant Letter Sequence (ELS)</option>
+                                <option value="acrostic">Acrostic Method</option>
+                                <option value="punctuation">Punctuation Pattern</option>
+                                <option value="null">Null Cipher</option>
+                            </select>
+                        </div>
+                        
+                        <div id="detectedMethodInfo" class="hidden">
+                            <p><strong>Detected Method:</strong> <span class="detected-method" id="detectedMethod">-</span></p>
+                            <p><small id="detectionConfidence">-</small></p>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="panel">
+                    <h2>📊 Decoding Analysis</h2>
+                    <div id="decodeAnalysis" class="text-analysis hidden">
+                        <h4>Text Pattern Analysis</h4>
+                        <div class="analysis-stats">
+                            <div class="analysis-item">
+                                <span class="analysis-label">Total Words:</span>
+                                <span class="analysis-value" id="decodeWordCount">0</span>
+                            </div>
+                            <div class="analysis-item">
+                                <span class="analysis-label">Total Characters:</span>
+                                <span class="analysis-value" id="decodeCharCount">0</span>
+                            </div>
+                            <div class="analysis-item">
+                                <span class="analysis-label">Punctuation Marks:</span>
+                                <span class="analysis-value" id="decodePunctCount">0</span>
+                            </div>
+                            <div class="analysis-item">
+                                <span class="analysis-label">Lines:</span>
+                                <span class="analysis-value" id="decodeLineCount">0</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="form-group" style="margin-top: 20px;">
+                        <h4>💡 Decoding Tips</h4>
+                        <div id="decodingTips" style="font-size: 0.9rem; color: #4a5568; line-height: 1.5;">
+                            <p>• <strong>ELS:</strong> Looks for patterns of letters at regular intervals</p>
+                            <p>• <strong>Acrostic:</strong> Reads first letters of each line or paragraph</p>
+                            <p>• <strong>Punctuation:</strong> Uses periods (0) and exclamation marks (1) as binary</p>
+                            <p>• <strong>Null Cipher:</strong> Reads first letters of consecutive words</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="control-panel">
+                <button class="decode-btn" id="decodeBtn">🔓 DECODE MESSAGE</button>
+            </div>
         </div>
 
-        <!-- NEW: AI Generation Loading -->
+        <!-- Loading Indicators -->
         <div id="aiLoadingDiv" class="loading hidden">
             <div class="spinner"></div>
             <p>AI is generating your carrier text...</p>
@@ -116,9 +205,15 @@
 
         <div id="loadingDiv" class="loading hidden">
             <div class="spinner"></div>
-            <p>Processing your message...</p>
+            <p id="loadingText">Processing your message...</p>
         </div>
 
+        <div id="decodeLoadingDiv" class="loading hidden">
+            <div class="spinner"></div>
+            <p>Analyzing and decoding your message...</p>
+        </div>
+
+        <!-- Results for Encoding -->
         <div id="resultsDiv" class="results hidden">
             <h2>Encoded Result</h2>
             <div id="resultText" class="result-text"></div>
@@ -145,11 +240,48 @@
             <div class="action-buttons">
                 <button class="action-btn" id="copyBtn">📋 Copy Result</button>
                 <button class="action-btn" id="downloadBtn">💾 Download</button>
-                <button class="action-btn" id="decodeBtn">🔓 Test Decode</button>
+                <button class="action-btn" id="testDecodeBtn">🔓 Test Decode</button>
                 <button class="action-btn reset-btn" id="resetBtn">🔄 Reset</button>
             </div>
         </div>
 
+        <!-- Results for Decoding -->
+        <div id="decodeResultsDiv" class="results hidden">
+            <h2>🎉 Decoded Message</h2>
+            
+            <div class="decoded-message">
+                <h3>Hidden Message Found:</h3>
+                <div class="message" id="decodedMessage">No message decoded yet</div>
+            </div>
+            
+            <div class="stats">
+                <div class="stat-item">
+                    <div class="stat-value" id="usedMethod">-</div>
+                    <div class="stat-label">Decoding Method</div>
+                </div>
+                <div class="stat-item">
+                    <div class="stat-value" id="messageLength">-</div>
+                    <div class="stat-label">Message Length</div>
+                </div>
+                <div class="stat-item">
+                    <div class="stat-value" id="decodingTime">-</div>
+                    <div class="stat-label">Processing Time</div>
+                </div>
+                <div class="stat-item">
+                    <div class="stat-value" id="confidence">-</div>
+                    <div class="stat-label">Confidence</div>
+                </div>
+            </div>
+
+            <div class="action-buttons">
+                <button class="action-btn" id="copyDecodedBtn">📋 Copy Message</button>
+                <button class="action-btn" id="downloadDecodedBtn">💾 Download Message</button>
+                <button class="action-btn" id="analyzeBtn">📊 View Analysis</button>
+                <button class="action-btn reset-btn" id="resetDecodeBtn">🔄 Reset Decoder</button>
+            </div>
+        </div>
+
+        <!-- Error and Success Messages -->
         <div id="errorDiv" class="error hidden">
             <strong>Error:</strong> <span id="errorMessage"></span>
         </div>
