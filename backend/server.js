@@ -6,6 +6,9 @@ const morgan = require('morgan');
 const multer = require('multer');
 const path = require('path');
 
+// Load environment variables from .env file
+require('dotenv').config();
+
 const app = express();
 const PORT = process.env.PORT || 3001;
 
