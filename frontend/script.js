@@ -260,17 +260,57 @@ class CodeVaultPro {
 
     // DECODING METHODS - Fixed to match encoding algorithms exactly
     decodeELS(text) {
-        // Use the same algorithm as testDecodeELS but try different skip distances
-        const cleanText = text.replace(/[^a-zA-Z]/g, '');
-        let bestResult = { message: '', confidence: 0 };
+    const cleanText = text.replace(/[^a-zA-Z]/g, '');
+    let bestResult = { message: '', confidence: 0 };
 
-        // Try skip distances from 2 to reasonable maximum
+    // Try different possible message lengths to find the skip distance
+    // The encoding uses: skipDistance = Math.floor(cleanCarrier.length / cleanMessage.length)
+    for (let possibleMsgLength = 3; possibleMsgLength <= Math.min(50, Math.floor(cleanText.length / 2)); possibleMsgLength++) {
+        const skipDistance = Math.floor(cleanText.length / possibleMsgLength);
+        
+        if (skipDistance < 2) continue; // Encoding requires skip >= 2
+        
+        // Use EXACT same algorithm as testDecodeELS
+        let message = '';
+        let currentPos = 0;
+        
+        for (let i = 0; i < possibleMsgLength; i++) {
+            let placed = false;
+            
+            // This matches the encoding algorithm exactly
+            for (let j = 0; j < skipDistance && !placed; j++) {
+                const pos = currentPos + j;
+                if (pos < text.length) {
+                    const char = text[pos];
+                    if (char.match(/[a-zA-Z]/)) {
+                        message += char.toLowerCase();
+                        placed = true;
+                    }
+                }
+            }
+            
+            currentPos += skipDistance;
+        }
+        
+        // Calculate confidence for this attempt
+        const confidence = this.calculateELSConfidence(message, skipDistance, cleanText.length);
+        
+        if (confidence > bestResult.confidence && message.length >= 3) {
+            bestResult = { message, confidence };
+        }
+        
+        // If we get very high confidence, we can stop
+        if (confidence > 85) break;
+    }
+
+    // If no good result found, try the alternative method with different skip patterns
+    if (bestResult.confidence < 40) {
         for (let skip = 2; skip <= Math.min(50, Math.floor(cleanText.length / 3)); skip++) {
             let message = '';
             let currentPos = 0;
             
-            // Use the same extraction method as the encoding
-            for (let i = 0; i < Math.floor(cleanText.length / skip); i++) {
+            // Extract up to 50 characters to prevent overly long messages
+            for (let i = 0; i < 50 && currentPos < text.length; i++) {
                 let placed = false;
                 
                 for (let j = 0; j < skip && !placed; j++) {
@@ -284,18 +324,22 @@ class CodeVaultPro {
                     }
                 }
                 
+                if (!placed) break;
                 currentPos += skip;
-                if (message.length > 100) break; // Prevent extremely long messages
             }
             
-            const confidence = this.calculateELSConfidence(message, skip, cleanText.length);
-            if (confidence > bestResult.confidence && message.length > 2) {
-                bestResult = { message, confidence };
+            if (message.length >= 3 && message.length <= 50) {
+                const confidence = this.calculateELSConfidence(message, skip, cleanText.length);
+                
+                if (confidence > bestResult.confidence) {
+                    bestResult = { message, confidence };
+                }
             }
         }
-
-        return bestResult;
     }
+
+    return bestResult;
+}
 
     calculateELSConfidence(message, skip, textLength) {
         let confidence = 0;
@@ -1412,7 +1456,7 @@ function switchTab(tabName) {
     }
 }
 
-// Initialize the application
+// Initialize the application please
 document.addEventListener('DOMContentLoaded', () => {
     window.codeVaultInstance = new CodeVaultPro();
 });
